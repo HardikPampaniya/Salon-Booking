@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: dream-beauty-unisex-studio-karanjade
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24.18.0"
+      - key: BOOKING_ENABLED
+        value: "false"
+      - key: SALON_TIMEZONE
+        value: Asia/Kolkata
+      - key: TRUST_PROXY_HOPS
+        value: "1"

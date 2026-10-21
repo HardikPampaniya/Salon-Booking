@@ -1,0 +1,39 @@
+# Changelog
+
+## Unreleased
+
+- Added a persistent browser service cart from the home picks and category menus, with a consolidated booking page for one visit date/time and one ₹100 advance.
+- Extended booking holds to validate and snapshot up to 20 distinct services, calculate the combined total server-side, and include the itemized service list in booking management and email notifications.
+- Kept services with unresolved offer prices or unapproved names/package details visible but unavailable for checkout; documented the exact menu source file and live Razorpay website-verification staging steps in README.
+- Added service/date/15-minute arrival-time browsing using salon-local hours, future-time filtering, a 60-day date limit, and tomorrow as the default after closing. Booking hold remains disabled until database, Razorpay, notification, and policy setup is complete.
+- Replaced staff/service-duration slot calculations with one transactional arrival-time reservation per offered time; updated cancellation messaging and technical/manual QA documentation to describe the arrival-time model.
+- Added 153 individual prices from five newer handwritten menu photos, corrected three superseded prices, and moved the source photos from generated build output into the ignored private source-material folder.
+- Clarified that the supplied reusable Razorpay collection page is not the per-appointment ₹100 checkout. Documented the Test Mode API keys and staging webhook still needed.
+- Removed a MongoDB connection string from `.env.example`, documented password rotation, and clarified that a fresh URI belongs in the ignored root `.env`.
+- Recorded the owner's fixed ₹100 advance policy, including cash change returned after services priced below ₹100; updated customer and staff booking summaries.
+- Changed booking readiness to require approval only for services selected to be bookable; deferred/unresolved menu entries stay off the booking form.
+- Added a beginner-friendly MongoDB Atlas and Razorpay test-mode walkthrough to the README and aligned server config loading with the documented root `.env` file.
+- Set every customer quote to a consistent 16px font with vertically centered slide content, and changed rotation to every four seconds.
+- Restored the previous salon-mirror photo in the home hero while retaining the new beauty photo on its category page.
+- Changed the customer-feedback carousel to automatic rotation with clickable selection dots and no arrow or play/pause controls; it pauses on hover, focus, hidden tabs, and reduced-motion settings.
+- Mapped the newly supplied women's, men's, and beauty photos to the matching category pages and aligned all three home-gallery photos to equal rows.
+- Added 16 legible handwritten-price individual services from the supplied salon menu PDF; recorded unreadable handwritten prices for owner follow-up.
+- Added a README checklist for the exact salon approvals, payment-provider credentials, hosting setup, and private test flows still needed before online bookings can open.
+- Kept public booking and live payment collection disabled while service durations, staff schedules, unreadable PDF prices, and provider setup remain incomplete.
+- Reworked the long single-page landing page into home, story, services, three category menus, visit, guarded booking, and not-found routes.
+- Moved full menu browsing to category routes and limited the home page to selected menu items; added a category search control and route/category tests.
+- Added `/book` readiness gating and local image mappings with no-request CSS fallbacks.
+- Tightened server booking readiness to require owner approval of the salon schedule and resolution of flagged service wording/offers before a service can become bookable.
+- Updated `MENU_DATA_REVIEW.md` with page references, handwritten revisions, and price discrepancies; legible corrections were added after the owner confirmed handwritten prices are current.
+- Updated project, maintenance, deployment, README, onboarding, and manual QA documentation for route fallback, PDF reconciliation, supplied photos, and displayed excerpts.
+- Added MongoDB-backed staff-aware booking holds with unique per-employee 15-minute reservations, 10-minute expiration, and idempotency keys.
+- Added separate appointment, payment, refund, webhook-event, and notification-outbox records.
+- Added Razorpay Orders and Checkout verification, signed raw-body webhooks, capture-only appointment confirmation, late-capture refund handling, and tracked cancellation refunds.
+- Added a private customer booking status/cancellation token, browser booking interface with automatic employee assignment (customer employee choice is disabled), and Resend email outbox for owner/customer updates.
+- Added booking readiness gates for test/live payment mode, MongoDB transaction support, salon setup, and versioned privacy/booking policies.
+- Added the six supplied salon photos to the service category visuals and home gallery, and displayed three short supplied customer-feedback excerpts with their names and no aggregate rating claim.
+- Added API, deployment, backup/recovery, security, employee roster sync, and maintenance documentation.
+- Added the salon-supplied profile, weekly hours, contact numbers, 31 service menu entries, review excerpts, and a directions link; incomplete service data keeps booking readiness closed.
+- Enforced the customer cancellation cutoff at 60 minutes and documented full captured-advance refunds for eligible cancellations.
+- Added a development-only notification mock that records `mocked` without claiming delivery and is refused in production/live payment mode.
+- Added deduplicated booking/payment/refund audit events for holds, confirmations, cancellations, expirations, capture exceptions, and refund transitions.

@@ -1,0 +1,19 @@
+{
+  "name": "salon-booking-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["client", "server"],
+  "scripts": {
+    "dev": "concurrently --kill-others-on-fail -n api,web -c magenta,cyan \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev --workspace @salon/server",
+    "dev:client": "npm run dev --workspace @salon/client",
+    "build": "npm run build --workspace @salon/client",
+    "start": "npm run start --workspace @salon/server",
+    "staff:sync": "npm run staff:sync --workspace=@salon/server --",
+    "test": "npm run test --workspace @salon/server && npm run test --workspace @salon/client"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}
