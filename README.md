@@ -24,11 +24,11 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173>. Vite serves the client and proxies `/api` to the Express API on port 5000. Without a database and provider credentials, the salon menu remains available while booking and payments stay disabled. The example notification mock marks outbox entries as `mocked`; it does not send email or simulate a payment.
+Open <http://localhost:5173>. Vite serves the client and proxies `/api` to the Express API on port 5000. Without a database and provider credentials, the salon menu remains available while booking and payments stay disabled. The example notification mock marks outbox entries as `mocked`; it does not send messages or simulate a payment.
 
 ## Publish a first preview
 
-The repository includes a Render Blueprint that builds the client and serves it with the API from one HTTPS URL. To publish, create a private GitHub repository, push this project without `.env`, then connect that repository to Render with **New → Blueprint** and select `render.yaml`. The preview keeps booking disabled and can run without MongoDB. The free host may sleep when idle, so use it for review and Razorpay website verification, not real bookings. Later code changes can be pushed and redeployed to the same public URL. See [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md) for the Atlas network access, URI, and secret setup steps.
+The website is already published at https://dream-beauty-unisex-studio-karanjade.onrender.com/ and is connected to the GitHub repository. Review code changes before pushing; Render then deploys them to the same URL. Keep the free service for preview/testing only because it sleeps when idle; use an always-on plan before real bookings. See DEPLOYMENT_RUNBOOK.md for Atlas network access, the MongoDB URI, and Render secret settings.
 
 ```powershell
 npm test
@@ -102,26 +102,42 @@ The free cluster is appropriate for development and simulated payments, but Mong
 2. Open the [Razorpay Dashboard](https://dashboard.razorpay.com) and switch to **Test Mode**. Go to **Account & Settings → API Keys → Generate Key** (the current label may appear as **Settings → API Keys**). Razorpay's [integration guide](https://razorpay.com/docs/server-integration/python/test-app/) explains test payments; test transactions are simulations and do not collect real money.
 3. Put the **test** Key ID in `RAZORPAY_KEY_ID` and the test Key Secret in `RAZORPAY_KEY_SECRET` in the root `.env`. Keep `RAZORPAY_MODE=test`. Never send either key in chat. Do not generate or enter Live Mode keys yet.
 
-### Razorpay asks for a website link while the site is local
+### Razorpay website verification and API setup
 
-`localhost` and `127.0.0.1` work only on your own computer, so Razorpay reviewers cannot open them. Keep using Razorpay **Test Mode** for local integration; test payments are simulations and do not move money. For a website verification request, first publish this project to a stable public HTTPS staging address (a temporary subdomain is fine), then paste that reachable URL into the website field in your Razorpay Dashboard. Keep `BOOKING_ENABLED=false` and test keys on staging while it is under review. Make sure the public pages show the salon identity/contact, service menu and prices, and the policy/contact information requested by Razorpay. Use the dashboard's exact request if it names specific pages or evidence; do not submit a made-up link, localhost URL, Razorpay.me collection link, or any API key/secret as the website address. Razorpay's [test-vs-live guidance](https://razorpay.com/blog/instant-payment-gateway-activation-india/) distinguishes test access from live prerequisites, and its [integration steps](https://razorpay.com/docs/server-integration/python/test-app/) document test transactions and separate live credentials. Website/link verification is separate from end-to-end readiness of this booking app.
+The website is already published at <https://dream-beauty-unisex-studio-karanjade.onrender.com/> and you have submitted it to Razorpay for verification. If the dashboard now shows verified, you do not need to resubmit the link. Keep using Razorpay **Test Mode** for integration checks; test payments are simulations and do not move money. Website verification is separate from the app's API keys, webhook, and booking readiness. If Razorpay asks for additional policy pages or evidence, follow the exact request shown in your account. Never use localhost, your Razorpay.me collection URL, or an API key/secret as the website address. Razorpay's [test-vs-live guidance](https://razorpay.com/blog/instant-payment-gateway-activation-india/) distinguishes test access from live prerequisites, and its [integration steps](https://razorpay.com/docs/server-integration/python/test-app/) document test transactions and separate live credentials.
 
 Current website gap: `/visit-us` has the one-hour cancellation and ₹100 refund wording, but there are not yet full standalone Terms, Privacy, and Refund pages. Add only the policy URLs Razorpay requests, using owner-approved wording. The server still reports the booking/privacy policy versions as drafts and keeps public checkout disabled.
 
 The supplied Razorpay Payment Button (`pl_TpMSC0xjEVMBYJ`) appears in the cart only after the customer selects services and an arrival time, while integrated online booking remains disabled. It collects a fixed ₹100 payment, but it does not pass the selected cart/date/time to this app, hold the arrival time, or confirm an appointment. The page tells customers to contact the studio to confirm first and share their receipt. Do not describe a Payment Button payment as a confirmed booking. For automatic booking confirmation, use the app's server-created Razorpay order flow, which ties a verified payment to the database hold; a Payment Button is a separate no-code collection method. Razorpay's [Payment Button documentation](https://tfs.np.razorpay.in/docs/payments/payment-button/custom) describes its customer fields and post-payment redirect, while its [server integration guide](https://razorpay.com/docs/server-integration/python/test-app/) describes creating an order and verifying the payment signature.
 
+### WhatsApp booking confirmations
+
+The app can send a WhatsApp utility-template message to the salon owner after a Razorpay payment is verified as captured. It sends the customer a separate confirmation only when the customer checks the optional WhatsApp consent box on checkout. Both messages include the booking reference, selected arrival date/time, services, service total, and ₹100 advance; the owner message also includes the customer's name and phone. A standalone Razorpay Payment Button does not trigger this flow because its payment is not tied to this app's booking record.
+
+To connect WhatsApp:
+
+1. Open the [WhatsApp Business Platform developer hub](https://whatsappbusiness.com/developers/developer-hub/) and follow **Get started** to create a Meta developer app and add WhatsApp. Use the Meta-provided test sender and a test recipient first. Meta provides test numbers for sandbox work; a live sender number and a stable production token must be configured before customer messages can go out.
+2. In WhatsApp Manager, create two **Utility** templates and wait until both are approved. Use the parameter order exactly as shown below. Save the approved template names and the language code (for example `en` or `en_US`). A payment does not create a WhatsApp service window, so the integration sends approved templates rather than free-form messages.
+   - Customer template name `salon_booking_confirm`, body: `Hi {{1}}, your visit at The Dream Beauty Unisex Studio is confirmed. Booking reference: {{2}}. Arrival: {{3}}. Services: {{4}}. Service total: {{5}}. Advance received: {{6}}. The advance is credited against your service bill.`
+   - Owner template name `salon_owner_booking`, body: `New website payment confirmed. Booking reference: {{1}}. Customer: {{2}}. Phone: {{3}}. Arrival: {{4}}. Services: {{5}}. Service total: {{6}}. Advance paid: {{7}}. {{8}}`
+3. In the Meta app's WhatsApp API setup, copy the **Phone number ID** (not the displayed telephone number) and create a long-lived server token with WhatsApp message permission. Keep the token private.
+4. In the Render service's **Environment** settings, set `NOTIFICATIONS_MODE=whatsapp`, then add `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_OWNER_NUMBER` (the owner's WhatsApp destination, including country code), `WHATSAPP_CUSTOMER_TEMPLATE`, `WHATSAPP_OWNER_TEMPLATE`, `WHATSAPP_TEMPLATE_LANGUAGE`, and `WHATSAPP_GRAPH_API_VERSION`. Use the latest supported Graph API version from Meta; this project template currently says `v26.0`. `WHATSAPP_DEFAULT_COUNTRY_CODE` defaults to `91`. The sender number and owner recipient should be different numbers. Set the same values in root `.env` for local testing; never put them in `client/.env`, Git, or chat.
+5. Deploy, use Razorpay **Test Mode**, and complete a booking using a Meta test recipient opted into WhatsApp updates. Check the outbox/server logs and the recipient phones. An API acceptance is not proof of delivery; check WhatsApp Manager if a recipient does not receive it. Keep `BOOKING_ENABLED=false` until the required prices/menu, policies, database, test payment/webhook, and owner checks are approved.
+
+The booking form's consent is optional and is saved with its wording version and timestamp. If a customer does not opt in, the owner still receives the booking notification, but the customer does not get an automatic WhatsApp message. On uncertain WhatsApp API timeouts the app marks the notification for manual review instead of retrying blindly, to avoid duplicate messages.
+
 ### Step 4 — Set up the test webhook after we have a staging website
 
-This step must wait until the API has an HTTPS web address. Razorpay cannot deliver webhooks to `localhost`.
+The current Render URL is already public HTTPS, so use it for the Test Mode webhook. Razorpay cannot deliver webhooks to `localhost`.
 
-1. Once we have a staging API address, open Razorpay Dashboard **Accounts & Settings → Webhooks → Add New Webhook**.
-2. Use `https://YOUR-STAGING-API-DOMAIN/api/webhooks/razorpay` as the webhook URL.
+1. Open Razorpay Dashboard Webhooks and add a Test Mode webhook.
+2. For Test Mode, use `https://dream-beauty-unisex-studio-karanjade.onrender.com/api/webhooks/razorpay` as the webhook URL.
 3. Create a strong webhook secret. It is a separate secret from the API Key Secret. Enter it in the Razorpay form and as `RAZORPAY_WEBHOOK_SECRET` in the server's `.env` / secret settings. Razorpay's [webhook setup guide](https://razorpay.com/docs/webhooks/setup-edit-payments/) describes this screen.
 4. Select these events: `payment.authorized`, `payment.captured`, `payment.failed`, `refund.processed`, and `refund.failed`.
 
 ### Step 5 — Test privately; only then prepare a live launch
 
-Keep `BOOKING_ENABLED=false` through setup. After menu details, salon hours/holidays, policies, database, test keys, public staging webhook, hosting, and owner notification email are ready, the test-mode flow must be checked for successful/failed payment, duplicate arrival-time booking, expiry, cancellation/refund, and webhook delivery. The site and API need HTTPS hosting; the webhook must use the API's public HTTPS URL. Only after the salon owner reviews and approves those results should live Razorpay account activation/keys and public booking be considered.
+Keep `BOOKING_ENABLED=false` through setup. After menu details, salon hours/holidays, policies, database, Razorpay test keys, public staging webhook, WhatsApp templates/provider, and hosting are ready, the test-mode flow must be checked for successful/failed payment, duplicate arrival-time booking, expiry, cancellation/refund, webhook delivery, and both WhatsApp notifications. The site and API need HTTPS hosting; the webhook must use the API's public HTTPS URL. Only after the salon owner reviews and approves those results should live Razorpay account activation/keys and public booking be considered.
 
 Do not paste provider secrets into chat, README, or Git. Enter them only in the ignored local `.env` for development or the hosting provider's server-side secret settings. The website frontend must never contain MongoDB or Razorpay secret values.
 

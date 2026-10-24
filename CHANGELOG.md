@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added WhatsApp Cloud API booking confirmations for the salon owner and optionally opted-in customer after captured payment; added approved-template variables, persistent consent evidence, readiness settings, and no-blind-retry manual review behavior.
+- Documented Meta Cloud API setup, customer/owner Utility templates, Render secrets, and updated the Atlas/Razorpay launch checklist.
 - Added a persistent browser service cart from the home picks and category menus, with a consolidated booking page for one visit date/time and one ₹100 advance.
 - Extended booking holds to validate and snapshot up to 20 distinct services, calculate the combined total server-side, and include the itemized service list in booking management and email notifications.
 - Kept services with unresolved offer prices or unapproved names/package details visible but unavailable for checkout; documented the exact menu source file and live Razorpay website-verification staging steps in README.

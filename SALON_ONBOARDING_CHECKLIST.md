@@ -20,7 +20,7 @@
 - The ₹100 advance stays fixed even for services priced below ₹100. The studio returns the difference in cash after those services.
 - Add salon breaks, holidays, special opening hours, and public phone changes to `server/src/config/salon.js` when known. The current schedule is seven days a week, 9:00 AM–9:00 PM.
 - Approve the one-hour-before-arrival cancellation cutoff, full ₹100 advance refund terms, arrival-time wording, privacy notice, policy version, privacy contact, and data-retention period.
-- Provide an owner notification inbox. Configure MongoDB replica-set/sharded transactions, Razorpay test account/key/webhook, Resend verified sender, hosting, HTTPS, CORS origins, and domain before test launch.
+- Provide the owner's WhatsApp recipient number (separate from the WhatsApp API sender). Configure MongoDB replica-set/sharded transactions, Razorpay test keys/webhook, Meta WhatsApp Cloud API sender/token and two approved Utility templates, hosting, HTTPS, CORS origins, and domain before test launch.
 - Reset the MongoDB database user's password because the earlier URI was placed in `.env.example`. Store a fresh URI only in the ignored root `.env`, include a database name in its path, and confirm the server reports transaction support.
 - The supplied Razorpay KYC and reusable `razorpay.me` page are ready for manual collection. The website booking flow still needs Test Mode API keys and a staging webhook; the reusable page is not the appointment checkout.
 - Complete test-mode payment, webhook, cancellation/refund, notification, and duplicate-arrival-time checks. Keep `BOOKING_ENABLED=false` until these checks pass.
@@ -31,6 +31,6 @@
 - Supply a standalone logo. The provided salon photos are already mapped; see `client/public/images/README.md` for filenames and alt text.
 - Use no aggregate rating unless its source and current value are verified.
 - Public email and purchased domain, if available.
-- Owner messaging preference; current notifications support email only. WhatsApp is a customer contact link and is not an automated notification integration.
+- Customer WhatsApp updates require the optional checkout consent and approved Meta Utility template. The owner gets a WhatsApp message for every confirmed payment; customer messages are skipped when consent is not given.
 
 Never send provider secrets in chat. Enter them in the local ignored `.env` file for development or in the deployment platform’s secret manager.

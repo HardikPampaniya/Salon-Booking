@@ -35,6 +35,7 @@ const rawHoldBodySchema = z.object({
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,20}$/),
   email: z.union([z.string().trim().email().max(254), z.literal('')]).optional(),
+  whatsappUpdatesOptIn: z.boolean().default(false),
   managementToken: z.string().min(32).max(200),
   policyAccepted: z.literal(true),
 });
@@ -127,7 +128,11 @@ export async function bookingReadiness() {
     || service.priceRupees <= 0
   ));
   if (salon.bookingSchedule.isPlaceholder || menuIncomplete) issues.push('salon_configuration_incomplete');
-  return { enabled: bookingReady() && !issues.includes('salon_configuration_incomplete'), issues };
+  return {
+    enabled: bookingReady() && !issues.includes('salon_configuration_incomplete'),
+    issues,
+    whatsappNotificationsEnabled: notificationStatus.mode === 'whatsapp' && notificationStatus.configured,
+  };
 }
 
 function salonDateString(date = new Date()) {
@@ -255,7 +260,8 @@ async function saveHold({ data, idempotencyKey }) {
             && existing.startAt?.getTime() === startAtDate.getTime()
             && existing.customer.name === data.name
             && existing.customer.phone === data.phone
-            && (existing.customer.email || '') === (data.email || '');
+            && (existing.customer.email || '') === (data.email || '')
+            && Boolean(existing.customer.whatsappUpdatesOptIn) === data.whatsappUpdatesOptIn;
           if (!sameRequest) throw fail(409, 'IDEMPOTENCY_KEY_REUSED', 'Booking details changed. Start a new booking request.');
           const existingPayment = await Payment.findOne({ bookingId: existing._id }).session(session);
           created = { booking: existing, payment: existingPayment, isNew: false };
@@ -279,7 +285,14 @@ async function saveHold({ data, idempotencyKey }) {
           status: 'held',
           holdExpiresAt,
           salonTimezone: salon.timezone,
-          customer: { name: data.name, phone: data.phone, email: data.email || undefined },
+          customer: {
+            name: data.name,
+            phone: data.phone,
+            email: data.email || undefined,
+            whatsappUpdatesOptIn: data.whatsappUpdatesOptIn,
+            whatsappUpdatesOptInAt: data.whatsappUpdatesOptIn ? now : null,
+            whatsappConsentVersion: data.whatsappUpdatesOptIn ? (process.env.WHATSAPP_CONSENT_VERSION || 'wa-updates-v1') : null,
+          },
           managementTokenHash: hashToken(data.managementToken),
           managementExpiresAt,
           policyVersion: POLICY_VERSION,

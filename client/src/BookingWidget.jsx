@@ -124,6 +124,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const [availability, setAvailability] = useState(null);
   const [availabilityState, setAvailabilityState] = useState('idle');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '' });
+  const [whatsappUpdatesOptIn, setWhatsappUpdatesOptIn] = useState(false);
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -213,7 +214,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     setMessage('');
     try {
       const serviceIds = cartServices.map((service) => service.id);
-      const fingerprint = JSON.stringify({ serviceIds, date, startAt, customer });
+      const fingerprint = JSON.stringify({ serviceIds, date, startAt, customer, whatsappUpdatesOptIn });
       if (!attemptRef.current || attemptRef.current.fingerprint !== fingerprint) {
         const prior = sessionStorage.getItem('salon_booking_attempt');
         const stored = prior ? JSON.parse(prior) : null;
@@ -234,6 +235,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           name: customer.name,
           phone: customer.phone,
           email: customer.email,
+          whatsappUpdatesOptIn,
           managementToken: attemptRef.current.managementToken,
           policyAccepted: acceptedPolicy,
         }),
@@ -376,6 +378,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             <h3 id="cart-payment-title">Pay the ₹100 advance</h3>
             <p>This fixed payment button collects ₹100 only. It does not send your selected services or arrival time to our booking system and does not reserve the slot. Please contact the studio to confirm your visit before paying, then share your Razorpay receipt with the team.</p>
             <RazorpayPaymentButton />
+            <p>This manual payment button cannot trigger automatic booking confirmation or WhatsApp messages. The integrated checkout will replace it after the database and payment setup is ready.</p>
           </section>}
           {paymentEnabled ? <>
             <div className="booking-fields">
@@ -385,6 +388,10 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
               <label>Phone number
                 <input autoComplete="tel" inputMode="tel" maxLength={20} value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} />
               </label>
+              {readiness?.whatsappNotificationsEnabled && <label className="policy-consent">
+                <input type="checkbox" checked={whatsappUpdatesOptIn} onChange={(event) => setWhatsappUpdatesOptIn(event.target.checked)} />
+                <span>I agree to receive booking and payment updates on WhatsApp from {salon.name} at the phone number above. This is optional.</span>
+              </label>}
               <label>Email for receipt and updates <span>(optional)</span>
                 <input autoComplete="email" inputMode="email" type="email" maxLength={254} value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} />
               </label>

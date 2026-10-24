@@ -4,6 +4,9 @@
 
 - Added a local-storage service cart to the home/category menus and turned `/book` into a combined cart, date, arrival-time, and checkout page. The cart supports up to 20 distinct services and applies one ₹100 advance per visit.
 - Extended the booking hold schema/model to accept service IDs, calculate the combined price on the server, save a price/name snapshot for every item, and show itemized services in booking management and email notifications. Legacy single-service API requests remain supported.
+- Added WhatsApp Cloud API notification delivery for booking confirmations after a payment is verified as captured. The salon owner receives customer details, services, date/time, total, and advance; a customer message is sent only after optional checkout consent.
+- Added persistent customer WhatsApp consent (including timestamp and consent-copy version), approved-template payloads for owner/customer, notification readiness checks, and manual review for uncertain WhatsApp send results so the system will not blindly duplicate a message.
+- Added Meta template/setup instructions and the remaining Atlas, Razorpay, Render, and WhatsApp steps to README and the deployment runbook.
 - Added polished cart, item removal, confirmed-price totals, unresolved-item warnings, and empty-cart navigation. Services whose current `needsConfirmation` flag is true cannot be added to checkout.
 - Documented the menu source edit path (`server/src/config/salon.js`) and public HTTPS staging workflow for Razorpay website verification in README.
 - Audited the React/Vite + Express/MongoDB workspace, confirmed the current menu and launch gates, and recorded baseline results before implementation: 30 server tests passed; the production frontend build passed.
@@ -30,6 +33,7 @@
 
 ## Verification
 
+- 2026-10-24 WhatsApp integration update: Vite production build passed using `npx vite build --configLoader runner --config vite.config.js` (33 modules); edited server modules passed `node --check`; `git diff --check` passed. The normal `npm run build` remains blocked by the known parent-directory permission error in this environment. No tests were run for this update, and database/provider end-to-end delivery remains pending account configuration.
 - Earlier baseline: `npm test` passed (30 server + 6 client tests) and the Vite build passed. For the arrival-time implementation, server syntax checks, the Vite build, and local HTTP smoke checks passed; the automated test suite was not run. The API test expectations were updated to the arrival-time behavior but have not been executed.
 - Latest menu configuration parsed successfully with `node --check server/src/config/salon.js`; no test suite was run for this menu update. The fixed API test expectation now reflects 200 services. MongoDB connectivity was not attempted with the exposed password.
 - After the arrival-time changes, Node syntax checks passed for the edited server modules and config, the Vite production build passed (33 modules), and `git diff --check` passed. Local smoke checks returned 200 for `/book`, `/api/health`, and next-day availability with 48 arrival choices from 9:00 AM through 8:45 PM. Health correctly reports booking disabled because MongoDB and Razorpay/policy setup are absent. The automated test suite was not run for this change.
@@ -48,12 +52,14 @@
 
 ## Remaining before public launch
 
+- The local `.env` has no MongoDB URI or Razorpay API/webhook credentials. Add a fresh Atlas URI, Razorpay Test Mode keys/webhook, and Meta Cloud API token/sender/template settings locally and in Render. Never send these secrets in chat.
+- Create and obtain approval for the two WhatsApp Utility templates. Enter the owner's WhatsApp destination number; use a different number from the API sender. Customer WhatsApp confirmation is optional and requires checkout consent.
 - Confirm unclear service names/inclusions, any unreadable or changing prices, and offer/package terms before those specific services are added to checkout. Durations and employee qualifications/schedules are not required for this arrival-time model.
 - Rotate the exposed MongoDB database-user password in Atlas, add the new URI to the ignored root `.env` with a database name in its path, then verify the connection reports transaction support.
-- Generate Razorpay Test Mode API keys and store them only in root `.env`; set up the webhook after staging has a public HTTPS API URL. Do not use the reusable `razorpay.me` page as the per-appointment checkout.
+- Generate Razorpay Test Mode API keys and store them only in root `.env`; configure a `payment.captured` webhook to the HTTPS Render endpoint. Do not use the reusable `razorpay.me` page or standalone Payment Button as the per-appointment checkout/WhatsApp trigger.
 - Keep the readable menu prices and fixed ₹100 advance. For a service priced below ₹100, the studio returns the difference in cash after service.
-- Supply a standalone logo. Confirm the public phone, special hours/holidays, privacy contact/retention, owner notification inbox, and final cancellation wording.
-- Configure a transaction-capable private MongoDB deployment, Razorpay test keys/webhook, Resend sender, hosting, HTTPS, domain, and production CORS. Keep BOOKING_ENABLED=false until test bookings, cancellation/refunds, webhook delivery, notifications, capacity, browser QA, and owner sign-off pass.
+- Supply a standalone logo. Confirm the public phone, special hours/holidays, privacy contact/retention, owner WhatsApp destination, and final cancellation wording.
+- Configure a transaction-capable private MongoDB deployment, Razorpay test keys/webhook, approved WhatsApp templates and Cloud API token/sender, hosting, HTTPS, domain, and production CORS. Keep BOOKING_ENABLED=false until test bookings, cancellation/refunds, webhook delivery, both WhatsApp recipients, capacity, browser QA, menu approval, and owner sign-off pass.
 - Test direct route refresh/rewrite rules on the chosen production host.
 
 ## Known limitations

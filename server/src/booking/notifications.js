@@ -34,12 +34,46 @@ function money(paise) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(paise / 100);
 }
 
+function whatsappNumber(value) {
+  let digits = String(value || '').replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (digits.length === 10) digits = `${process.env.WHATSAPP_DEFAULT_COUNTRY_CODE || '91'}${digits}`;
+  else if (digits.length === 11 && digits.startsWith('0')) digits = `91${digits.slice(1)}`;
+  return /^\d{8,15}$/.test(digits) ? digits : null;
+}
+
+function templateParameters(role, booking, when, services, salonAdjustmentLine) {
+  if (role === 'customer') {
+    return [booking.customer.name, booking.reference, when, services, money(booking.servicePricePaise), money(booking.advancePaise)];
+  }
+  return [
+    booking.reference,
+    booking.customer.name,
+    booking.customer.phone,
+    when,
+    services,
+    money(booking.servicePricePaise),
+    money(booking.advancePaise),
+    salonAdjustmentLine,
+  ];
+}
+
 export async function queueBookingEvent(booking, eventType, { session, note = '' } = {}) {
   const salonName = process.env.PUBLIC_SALON_NAME || 'Salon';
   const owner = process.env.OWNER_EMAIL?.trim();
   const customer = booking.customer?.email?.trim();
   const mode = notificationConfiguration();
-  const recipients = mode.mockAllowed
+  if (mode.mode === 'whatsapp' && eventType !== 'confirmed') return;
+  const customerWhatsApp = booking.customer?.whatsappUpdatesOptIn
+    ? whatsappNumber(booking.customer.phone)
+    : null;
+  const ownerWhatsApp = whatsappNumber(process.env.WHATSAPP_OWNER_NUMBER);
+  const recipients = mode.mode === 'whatsapp'
+    ? [
+      ...(ownerWhatsApp ? [{ role: 'owner', to: ownerWhatsApp }] : []),
+      ...(customerWhatsApp ? [{ role: 'customer', to: customerWhatsApp }] : []),
+    ]
+    : mode.mockAllowed
     ? [
       { role: 'owner', to: owner || 'mock://owner' },
       { role: 'customer', to: customer || 'mock://customer' },
@@ -64,6 +98,9 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
     : salonAdjustmentPaise < 0
       ? `Cash change to return after service: ${money(Math.abs(salonAdjustmentPaise))}`
       : `Remaining amount to collect at salon: ${money(salonAdjustmentPaise)}`;
+  const serviceSummary = (booking.services?.length
+    ? booking.services.map((service) => `${service.serviceName} (${money(service.pricePaise)})`)
+    : [booking.serviceName]).join('; ').slice(0, 900);
   const detailLines = [
     `${statusText} · ${salonName}`,
     `Booking reference: ${booking.reference}`,
@@ -80,10 +117,17 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
     ...(eventType.startsWith('refund') ? [`Refund: ${note || 'Status is being checked with the payment provider.'}`] : []),
   ];
   for (const { role, to } of recipients) {
+    const whatsapp = mode.mode === 'whatsapp';
     const notification = {
-      dedupeKey: `${booking.id || booking._id}:${eventType}:${role}`,
+      dedupeKey: `${booking.id || booking._id}:${eventType}:${whatsapp ? 'whatsapp:' : ''}${role}`,
       bookingId: booking._id || booking.id,
+      channel: whatsapp ? 'whatsapp' : 'email',
       to,
+      ...(whatsapp ? {
+        templateName: role === 'owner' ? process.env.WHATSAPP_OWNER_TEMPLATE : process.env.WHATSAPP_CUSTOMER_TEMPLATE,
+        templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE,
+        templateParameters: templateParameters(role, booking, when, serviceSummary, salonAdjustmentLine),
+      } : {}),
       subject: `${statusText} · ${booking.reference}`,
       text: [...detailLines, ...(note ? [`Note: ${note}`] : [])].join('\n'),
     };
@@ -118,18 +162,59 @@ async function sendEmail({ dedupeKey, to, subject, text }) {
   return { providerMessageId: result.id || null };
 }
 
+async function sendWhatsApp({ to, templateName, templateLanguage, templateParameters: parameters }) {
+  const version = process.env.WHATSAPP_GRAPH_API_VERSION;
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  if (!version || !phoneNumberId || !accessToken || !templateName || !templateLanguage) {
+    const error = new Error('WhatsApp provider is not configured.');
+    error.code = 'WHATSAPP_PROVIDER_NOT_CONFIGURED';
+    throw error;
+  }
+  const response = await fetch(`https://graph.facebook.com/${version}/${encodeURIComponent(phoneNumberId)}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to,
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: templateLanguage },
+        components: [{
+          type: 'body',
+          parameters: parameters.map((text) => ({ type: 'text', text })),
+        }],
+      },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    const error = new Error('WhatsApp provider request failed.');
+    error.code = `WHATSAPP_HTTP_${response.status}`;
+    throw error;
+  }
+  const result = await response.json().catch(() => ({}));
+  return { providerMessageId: result.messages?.[0]?.id || null };
+}
+
 export async function processNotificationQueue({ limit = 10 } = {}) {
   const abandonedBefore = new Date(Date.now() - 2 * 60_000);
   const idempotencyWindowStart = new Date(Date.now() - 23 * 60 * 60_000);
   await Notification.updateMany(
-    { status: 'sending', updatedAt: { $lt: abandonedBefore }, $or: [
+    { status: 'sending', channel: 'whatsapp', updatedAt: { $lt: abandonedBefore } },
+    { $set: { status: 'manual_review', lastErrorCode: 'WHATSAPP_RESULT_UNKNOWN' } },
+  );
+  await Notification.updateMany(
+    { status: 'sending', channel: { $ne: 'whatsapp' }, updatedAt: { $lt: abandonedBefore }, $or: [
       { updatedAt: { $lte: idempotencyWindowStart } },
       { attempts: { $gte: 5 } },
     ] },
     { $set: { status: 'manual_review', lastErrorCode: 'EMAIL_RESULT_UNKNOWN' } },
   );
   await Notification.updateMany(
-    { status: 'sending', updatedAt: { $lt: abandonedBefore, $gt: idempotencyWindowStart }, attempts: { $lt: 5 } },
+    { status: 'sending', channel: { $ne: 'whatsapp' }, updatedAt: { $lt: abandonedBefore, $gt: idempotencyWindowStart }, attempts: { $lt: 5 } },
     { $set: { status: 'pending', nextAttemptAt: new Date() } },
   );
 
@@ -149,12 +234,22 @@ export async function processNotificationQueue({ limit = 10 } = {}) {
       continue;
     }
     try {
-      const accepted = await sendEmail(notification);
+      const accepted = notification.channel === 'whatsapp'
+        ? await sendWhatsApp(notification)
+        : await sendEmail(notification);
       await Notification.updateOne(
         { _id: notification._id, status: 'sending' },
         { $set: { status: 'accepted', acceptedAt: new Date(), providerMessageId: accepted.providerMessageId, lastErrorCode: null } },
       );
     } catch (error) {
+      if (notification.channel === 'whatsapp') {
+        await Notification.updateOne(
+          { _id: notification._id, status: 'sending' },
+          { $set: { status: 'manual_review', lastErrorCode: error.code || 'WHATSAPP_RESULT_UNKNOWN' } },
+        );
+        console.error('whatsapp_delivery_needs_review', { code: error.code || 'WHATSAPP_RESULT_UNKNOWN' });
+        continue;
+      }
       const exhausted = notification.attempts >= 5;
       const delayMinutes = Math.min(60, 2 ** notification.attempts);
       await Notification.updateOne(

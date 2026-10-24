@@ -3,9 +3,13 @@ import mongoose from 'mongoose';
 const notificationSchema = new mongoose.Schema({
   dedupeKey: { type: String, required: true, unique: true },
   bookingId: { type: mongoose.Schema.Types.ObjectId, ref: 'Booking', required: true },
+  channel: { type: String, enum: ['email', 'whatsapp'], required: true, default: 'email' },
   to: { type: String, required: true },
   subject: { type: String, required: true },
   text: { type: String, required: true },
+  templateName: { type: String, default: null, maxlength: 512 },
+  templateLanguage: { type: String, default: null, maxlength: 20 },
+  templateParameters: { type: [String], default: [] },
   status: { type: String, enum: ['pending', 'sending', 'accepted', 'mocked', 'manual_review'], required: true, default: 'pending' },
   attempts: { type: Number, required: true, default: 0 },
   nextAttemptAt: { type: Date, required: true, default: Date.now },

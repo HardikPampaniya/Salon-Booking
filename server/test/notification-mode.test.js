@@ -22,6 +22,6 @@ describe('notification transport mode', () => {
   });
 
   it('rejects unknown notification transports', () => {
-    assert.equal(notificationConfiguration({ NOTIFICATIONS_MODE: 'whatsapp', NODE_ENV: 'development' }).issue, 'notification_mode_invalid');
+    assert.equal(notificationConfiguration({ NOTIFICATIONS_MODE: 'sms', NODE_ENV: 'development' }).issue, 'notification_mode_invalid');
   });
 });
