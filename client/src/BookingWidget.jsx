@@ -132,6 +132,9 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const attemptRef = useRef(null);
   const managementRef = useRef(null);
+  const timePickerRef = useRef(null);
+  const timePickerTriggerRef = useRef(null);
+  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const cartServices = cartIds.map((id) => services.find((service) => service.id === id)).filter(Boolean);
   const cartIsComplete = cartIds.length > 0 && cartIds.length <= 20
     && cartServices.length === cartIds.length && cartServices.every(isReadyToBook);
@@ -168,6 +171,20 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       });
     return () => controller.abort();
   }, [forceClosed, availabilityServiceId, date]);
+
+  useEffect(() => {
+    const dialog = timePickerRef.current;
+    if (!timePickerOpen || !dialog) return undefined;
+
+    if (!dialog.open) dialog.showModal();
+    const selectedButton = dialog.querySelector('.slot-choice.is-selected');
+    (selectedButton || dialog.querySelector('.slot-choice') || dialog.querySelector('.slot-dialog-close'))?.focus();
+
+    return () => {
+      if (dialog.open) dialog.close();
+      timePickerTriggerRef.current?.focus();
+    };
+  }, [timePickerOpen]);
 
   useEffect(() => {
     const saved = sessionStorage.getItem('salon_booking_management');
@@ -366,12 +383,36 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             {availabilityState === 'closed' && <p>The studio is closed on this date. Please choose another day.</p>}
             {availabilityState === 'empty' && <p>No later arrival times are available for this date. Try another day.</p>}
             {availabilityState === 'error' && <p role="alert">Arrival times are temporarily unavailable. Please try again.</p>}
-            {availabilityState === 'ready' && <div className="slot-list">{slots.map((slot) => (
-              <button className={startAt === slot.startAt ? 'slot-choice is-selected' : 'slot-choice'} type="button" key={slot.startAt} aria-pressed={startAt === slot.startAt} onClick={() => setStartAt(slot.startAt)}>
+            {availabilityState === 'ready' && <button
+              ref={timePickerTriggerRef}
+              className="slot-picker-trigger"
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={timePickerOpen}
+              onClick={() => setTimePickerOpen(true)}
+            >
+              <span>{selectedArrival ? selectedArrival.time : 'Select an arrival time'}</span>
+              <span>{selectedArrival ? 'Change time' : `${slots.length} times available`} <span aria-hidden="true">⌄</span></span>
+            </button>}
+          </fieldset>
+          {timePickerOpen && availabilityState === 'ready' && <dialog
+            ref={timePickerRef}
+            className="slot-dialog"
+            aria-labelledby="slot-dialog-title"
+            onClose={() => setTimePickerOpen(false)}
+            onClick={(event) => { if (event.target === timePickerRef.current) setTimePickerOpen(false); }}
+          >
+            <div className="slot-dialog-heading">
+              <div><p className="eyebrow">{formatVisitDate(date, salon.timezone)}</p><h3 id="slot-dialog-title">Choose your arrival time</h3></div>
+              <button className="slot-dialog-close" type="button" aria-label="Close arrival time choices" onClick={() => setTimePickerOpen(false)}>×</button>
+            </div>
+            <p className="slot-dialog-note">Choose when you plan to arrive. The team will begin your services when available.</p>
+            <div className="slot-list">{slots.map((slot) => (
+              <button className={startAt === slot.startAt ? 'slot-choice is-selected' : 'slot-choice'} type="button" key={slot.startAt} aria-pressed={startAt === slot.startAt} onClick={() => { setStartAt(slot.startAt); setTimePickerOpen(false); }}>
                 {slot.time}
               </button>
-            ))}</div>}
-          </fieldset>
+            ))}</div>
+          </dialog>}
           {selectedArrival && <p className="booking-arrival-note">Selected arrival: {formatVisitDate(date, salon.timezone)} at {selectedArrival.time}. Your services begin when the team is available.</p>}
           {!paymentEnabled && cartIsComplete && selectedArrival && <section className="cart-payment-panel" aria-labelledby="cart-payment-title">
             <p className="eyebrow">Razorpay payment</p>

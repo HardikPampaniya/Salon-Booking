@@ -143,7 +143,18 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .slot-picker legend { margin-bottom: 10px; color: #574d46; font-size: 10px; font-weight: 600; }
 .slot-picker > p { color: #756a62; font-size: 11px; }
 .booking-arrival-note { margin: 10px 0 16px; color: #685d55; font-size: 11px; line-height: 1.7; }
-.slot-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.slot-picker-trigger { width: min(100%, 390px); min-height: 48px; margin-top: 3px; padding: 9px 13px; display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #cfc3b8; background: #fffdfa; color: #514943; font: 600 12px "DM Sans", sans-serif; text-align: left; cursor: pointer; }
+.slot-picker-trigger > span:last-child { color: #82766e; font-size: 10px; font-weight: 400; white-space: nowrap; }
+.slot-picker-trigger:hover { border-color: #8e6258; background: #f4ede6; }
+.slot-picker-trigger:focus-visible, .slot-dialog-close:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
+.slot-dialog { width: min(560px, calc(100vw - 28px)); max-width: none; max-height: min(82vh, 720px); margin: auto; padding: clamp(18px, 4vw, 28px); overflow: hidden; border: 1px solid #d8c8ba; background: #fffdfa; color: #514943; box-shadow: 0 24px 90px #211d1b55; }
+.slot-dialog::backdrop { background: #211d1b99; backdrop-filter: blur(2px); }
+.slot-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.slot-dialog-heading .eyebrow { margin: 0 0 8px; color: #927265; font-size: 9px; }
+.slot-dialog-heading h3 { margin: 0; color: #514943; font: 400 clamp(22px, 4vw, 30px) var(--serif); }
+.slot-dialog-close { flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid #d8c8ba; background: #f8f2eb; color: #514943; font: 24px/1 "DM Sans", sans-serif; cursor: pointer; }
+.slot-dialog-note { margin: 12px 0 16px; color: #756a62; font-size: 10px; line-height: 1.7; }
+.slot-list { max-height: min(54vh, 490px); padding: 2px 4px 5px 1px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
 .slot-choice { min-width: 95px; min-height: 46px; border: 1px solid #cfc3b8; padding: 7px 10px; background: #fffdfa; color: #514943; font: 600 11px "DM Sans", sans-serif; cursor: pointer; }
 .slot-choice small { display: block; margin-top: 4px; color: #82766e; font-size: 8px; font-weight: 400; }
 .slot-choice:hover, .slot-choice.is-selected { border-color: #8e6258; background: #eee4da; }
@@ -421,6 +432,11 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
   .cart-item { grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; }
   .cart-item-remove { grid-column: 2; justify-self: end; }
   .cart-item > div strong { font-size: 15px; }
+}
+
+@media (max-width: 520px) {
+  .slot-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+  .slot-choice { min-width: 0; min-height: 44px; padding: 7px 6px; }
 }
 
 @media (max-width: 900px) {

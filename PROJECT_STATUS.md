@@ -2,6 +2,7 @@
 
 ## Completed
 
+- Replaced the cart's long arrival-time grid with a compact selector that opens a keyboard-accessible modal list; updated directions to the owner's supplied Google Maps link and changed the Call the studio link to the WhatsApp number.
 - Added a local-storage service cart to the home/category menus and turned `/book` into a combined cart, date, arrival-time, and checkout page. The cart supports up to 20 distinct services and applies one ₹100 advance per visit.
 - Extended the booking hold schema/model to accept service IDs, calculate the combined price on the server, save a price/name snapshot for every item, and show itemized services in booking management and email notifications. Legacy single-service API requests remain supported.
 - Added WhatsApp Cloud API notification delivery for booking confirmations after a payment is verified as captured. The salon owner receives customer details, services, date/time, total, and advance; a customer message is sent only after optional checkout consent.
@@ -33,6 +34,7 @@
 
 ## Verification
 
+- `npx vite build --configLoader runner --config vite.config.js` — passed (Vite 7.3.7, 33 modules transformed) after the compact arrival-time selector and contact-link updates.
 - 2026-10-24 WhatsApp integration update: Vite production build passed using `npx vite build --configLoader runner --config vite.config.js` (33 modules); edited server modules passed `node --check`; `git diff --check` passed. The normal `npm run build` remains blocked by the known parent-directory permission error in this environment. No tests were run for this update, and database/provider end-to-end delivery remains pending account configuration.
 - Earlier baseline: `npm test` passed (30 server + 6 client tests) and the Vite build passed. For the arrival-time implementation, server syntax checks, the Vite build, and local HTTP smoke checks passed; the automated test suite was not run. The API test expectations were updated to the arrival-time behavior but have not been executed.
 - Latest menu configuration parsed successfully with `node --check server/src/config/salon.js`; no test suite was run for this menu update. The fixed API test expectation now reflects 200 services. MongoDB connectivity was not attempted with the exposed password.

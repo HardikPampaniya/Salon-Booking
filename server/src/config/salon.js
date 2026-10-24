@@ -5,9 +5,9 @@ export const salon = {
   tagline: 'Hair, skin, nails, and grooming in Karanjade',
   neighborhood: 'Karanjade · Navi Mumbai',
   address: 'Shop No. 8, Sahara Sankalp Residency, Plot No. 16, Sector 2A, Karanjade, Navi Mumbai, Maharashtra 410206',
-  phone: '+91 84604 84089',
+  phone: '+91 77383 85236',
   whatsappNumber: '+91 77383 85236',
-  mapUrl: 'https://www.google.com/maps/search/?api=1&query=Shop+No.+8%2C+Sahara+Sankalp+Residency%2C+Plot+No.+16%2C+Sector+2A%2C+Karanjade%2C+Navi+Mumbai%2C+Maharashtra+410206',
+  mapUrl: 'https://maps.app.goo.gl/j5NvUKA1eyYby9oD7?g_st=aw',
   timezone: process.env.SALON_TIMEZONE || 'Asia/Kolkata',
   hours: [
     { day: 'Monday', open: '9:00 AM', close: '9:00 PM' },
