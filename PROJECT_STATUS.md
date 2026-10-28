@@ -17,10 +17,10 @@
 ## Verification
 
 - Baseline before edits: 30 server tests and 6 client tests passed; frontend build passed.
-- After implementation: 32 server tests and 6 client tests passed.
+- Final verification: 35 server tests and 6 client tests passed.
 - Frontend production build passed with `npx vite build --configLoader runner --config vite.config.js` (33 modules transformed). The regular build command still hits the environment’s esbuild parent-directory permission issue.
-- API smoke check previously confirmed 200 services, three groups, booking readiness disabled, and HTTP 503 for unconfigured availability.
-- `git diff --check` passed before documentation completion; rerun after final edits.
+- Final API startup smoke check returned HTTP 200 for the site and `/services/women`, returned 200 services and all three canonical group paths, reported booking disabled, and returned HTTP 503 for unavailable appointment times.
+- Final `git diff --check` and server JavaScript syntax checks passed.
 - Automated visual QA could not run: the available computer-use browser bridge failed to connect to its native pipe. No browser screenshot, keyboard, screen-reader, or responsive visual QA is claimed.
 
 ## Current blockers
@@ -28,7 +28,7 @@
 - All 200 service durations are unset. Thirty records carry wording, package, or price confirmation flags. Four offers do not have a final payable price.
 - No employee roster, service eligibility, schedules, breaks, or leave have been configured or owner-approved. The server must automatically assign one employee qualified for every service in a cart.
 - The local `.env` has an empty MongoDB URI and empty Razorpay credentials; no local end-to-end payment or transaction test has been run. WhatsApp/Resend credentials are also absent.
-- No private staging database/deployment is configured. The live Render deployment remains on its current revision because the changes have not been pushed; direct production deploy would bypass the staging, browser review, provider test, and owner-sign-off steps.
+- No private staging database/deployment is configured. The changes were pushed to a separate GitHub review branch only; the live Render deployment remains on its current revision. Do not deploy directly to production before staging, browser review, provider tests, and owner sign-off.
 - The custom-domain HTTPS certificate previously showed an error. Confirm a valid certificate before using that domain for production webhook delivery.
 - The browser automation bridge is unavailable; follow [MANUAL_QA_CHECKLIST.md](MANUAL_QA_CHECKLIST.md) on a local browser or staging deployment.
 
@@ -43,4 +43,4 @@
 
 ## Git and deployment
 
-The configured remote points to `HardikPampaniya/Salon-Booking`; the working branch is `main`. This change set has not been pushed or deployed. The existing Render service is production-facing and no separate staging service/database is available, so keep the checked-in Render booking switch disabled and review the local diff before any production push.
+Commit `ec863ae` from local `main` was pushed to GitHub review branch `codex/salon-menu-booking-ec863ae`; it was not merged to remote `main` and no Render deployment was triggered or verified. The existing Render service is production-facing and no separate staging service/database is available, so keep the checked-in Render booking switch disabled until staging, browser review, provider tests, and owner sign-off are complete.
