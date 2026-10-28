@@ -18,10 +18,10 @@ const fallbackSalon = {
     .map((day) => ({ day, open: '9:00 AM', close: '9:00 PM' })),
 };
 
-const categoryPages = [
-  { path: '/services/womens-hair', name: "Women's hair", description: 'Haircuts, styling, colour, and treatments from the salon menu.' },
-  { path: '/services/beauty', name: 'Beauty services', description: 'Facial, waxing, manicure, and pedicure services from the salon menu.' },
-  { path: '/services/mens', name: "Men's services", description: 'Hair, beard, skin, and grooming services from the salon menu.' },
+const fallbackCategoryPages = [
+  { id: 'women', path: '/services/women', name: 'Women', imageCategory: "Women's hair", description: 'Haircuts, styling, colour, and treatments listed for women in the salon menu.' },
+  { id: 'men', path: '/services/men', name: 'Men', imageCategory: "Men's services", description: 'Hair, beard, skin, and grooming services listed for men.' },
+  { id: 'beauty', path: '/services/beauty', name: 'Beauty services', imageCategory: 'Beauty services', description: 'Facials, waxing, threading, nails, and other beauty services listed in the supplied menu.' },
 ];
 const selectedServiceIds = [
   'women-hair-wash-blowdry', 'women-haircut-wash', 'beauty-hydra-facial',
@@ -48,6 +48,7 @@ const routeTitles = {
 function useSalonData() {
   const [salon, setSalon] = useState(fallbackSalon);
   const [services, setServices] = useState([]);
+  const [categoryPages, setCategoryPages] = useState(fallbackCategoryPages);
   const [apiState, setApiState] = useState('loading');
 
   useEffect(() => {
@@ -61,13 +62,16 @@ function useSalonData() {
         if (!active) return;
         setSalon(config.salon ?? fallbackSalon);
         setServices(serviceList.services ?? []);
+        setCategoryPages(Array.isArray(serviceList.groups) && serviceList.groups.length
+          ? serviceList.groups.map((group) => ({ ...group, name: group.label }))
+          : fallbackCategoryPages);
         setApiState('ready');
       })
       .catch(() => active && setApiState('fallback'));
     return () => { active = false; };
   }, []);
 
-  return { salon, services, apiState };
+  return { salon, services, categoryPages, apiState };
 }
 
 function RouteLink({ to, className, children, onClick, ...props }) {
@@ -161,7 +165,7 @@ function getServiceDetails(service) {
 
 function ServiceCard({ service, index, compact = false, cartIds, addToCart, removeFromCart }) {
   const inCart = cartIds.includes(service.id);
-  const canAddToCart = service.bookable === true && service.needsConfirmation !== true
+  const canAddToCart = service.menuSelectable === true && service.needsConfirmation !== true
     && Number.isFinite(service.priceRupees) && service.priceRupees > 0;
   const price = service.priceDisplay || (Number.isFinite(service.priceRupees)
     ? `₹${new Intl.NumberFormat('en-IN').format(service.priceRupees)}` : 'Price to be confirmed');
@@ -170,20 +174,20 @@ function ServiceCard({ service, index, compact = false, cartIds, addToCart, remo
     <h3>{service.name}</h3>
     {service.needsConfirmation && <p className="service-confirmation">Some wording, inclusions, or offer details need confirmation.</p>}
     {getServiceDetails(service) && <p className="service-details">{getServiceDetails(service)}</p>}
-    <div className="service-meta"><span>Visit during salon hours</span><strong>{price}</strong></div>
+    <div className="service-meta"><span>{Number.isInteger(service.durationMinutes) && service.durationMinutes > 0 ? `${service.durationMinutes} minute visit` : 'Duration to be confirmed'}</span><strong>{price}</strong></div>
     {canAddToCart
       ? <button className={`service-cart-button${inCart ? ' is-added' : ''}`} type="button" disabled={!inCart && cartIds.length >= 20} onClick={() => inCart ? removeFromCart(service.id) : addToCart(service.id)} aria-pressed={inCart}>{inCart ? 'Remove from cart' : cartIds.length >= 20 ? 'Cart limit reached' : 'Add to cart'} <span aria-hidden="true">{inCart ? '−' : '+'}</span></button>
-      : <p className="service-cart-unavailable">Available to add after price and details are confirmed</p>}
+      : <p className="service-cart-unavailable">Available to add after price and menu details are confirmed</p>}
   </article>;
 }
 
-function CategoryCards({ services }) {
+function CategoryCards({ services, categoryPages }) {
   return <div className="category-grid">
     {categoryPages.map((category) => {
-      const count = servicesForCategory(services, category.name).length;
+      const count = servicesForCategory(services, category.id).length;
       return <article className="category-card" key={category.path}>
         <RouteLink to={category.path} className="category-card-link" aria-label={`Browse ${category.name}`}>
-          <CategoryVisual category={category.name} />
+          <CategoryVisual category={category.imageCategory} />
           <div className="category-card-copy"><p className="eyebrow">{count ? `${count} menu items` : 'Salon menu'}</p><h2>{category.name}</h2><p>{category.description}</p><span className="text-link">Browse services <Arrow /></span></div>
         </RouteLink>
       </article>;
@@ -191,7 +195,7 @@ function CategoryCards({ services }) {
   </div>;
 }
 
-function HomePage({ salon, services, apiState, cartIds, addToCart, removeFromCart }) {
+function HomePage({ salon, services, categoryPages, apiState, cartIds, addToCart, removeFromCart }) {
   const selected = selectedServiceIds.map((id) => services.find((service) => service.id === id)).filter(Boolean);
   return <main id="main">
     <section className="hero hero-short" aria-labelledby="hero-title">
@@ -210,7 +214,7 @@ function HomePage({ salon, services, apiState, cartIds, addToCart, removeFromCar
       <div className="intro-stats"><span>01 <small>Women’s hair</small></span><span>02 <small>Beauty services</small></span><span>03 <small>Men’s services</small></span></div>
     </section>
 
-    <section className="home-categories section-shell"><div className="section-heading"><div><p className="eyebrow">Explore the menu</p><h2>Find your<br /><em>service.</em></h2></div><p>Choose a category to view the full salon menu, prices, and details that still need confirmation.</p></div><CategoryCards services={services} /></section>
+    <section className="home-categories section-shell"><div className="section-heading"><div><p className="eyebrow">Explore the menu</p><h2>Find your<br /><em>service.</em></h2></div><p>Choose a category to view the full salon menu, prices, and details that still need confirmation.</p></div><CategoryCards services={services} categoryPages={categoryPages} /></section>
 
     <section className="services-section section-shell home-picks">
       <div className="section-heading"><div><p className="eyebrow">A few from the menu</p><h2>Start with<br /><em>something lovely.</em></h2></div><p>A small selection across hair, beauty, and grooming. Visit the category pages for all menu items.</p></div>
@@ -302,37 +306,47 @@ function FeedbackCarousel() {
   </div>;
 }
 
-function ServicesPage({ services }) {
-  return <main id="main" className="inner-page"><section className="page-hero section-shell"><PageHeading eyebrow="The menu" title="Services for" accent="your visit." copy="Explore women’s hair, beauty, and men’s services. Open a category to see its menu and prices. A few offer and package details still need confirmation." /></section>
-    <section className="section-shell page-section"><CategoryCards services={services} /></section>
+function ServicesPage({ services, categoryPages }) {
+  return <main id="main" className="inner-page"><section className="page-hero section-shell"><PageHeading eyebrow="The menu" title="Services for" accent="your visit." copy="Browse the women’s and men’s menu, plus the beauty services listed by the studio. Choose a category to search, filter, and view prices." /></section>
+    <section className="section-shell page-section"><CategoryCards services={services} categoryPages={categoryPages} /></section>
     <section className="menu-note section-shell" aria-label="Menu guidance">
-      <div className="menu-note-copy"><p className="eyebrow">Need help choosing?</p><p>Choose a category above to browse its services and prices. For questions about a treatment, package, or current availability, contact the studio directly. Online booking is still being prepared.</p></div>
-      <span className="menu-note-categories">Women’s hair <i aria-hidden="true">·</i> Beauty <i aria-hidden="true">·</i> Men’s services</span>
+      <div className="menu-note-copy"><p className="eyebrow">Need help choosing?</p><p>Choose a category above to browse its services and prices. The supplied menu does not say whether the general beauty list is for women, men, or everyone, so it remains in a separate Beauty services section until the studio confirms its audience. Online booking remains unavailable until service durations, staff schedules, and payment setup are approved.</p></div>
+      <span className="menu-note-categories">Women <i aria-hidden="true">·</i> Men <i aria-hidden="true">·</i> Beauty services</span>
     </section>
   </main>;
 }
 
-function ServiceCategoryPage({ category, services, apiState, cartIds, addToCart, removeFromCart }) {
+function ServiceCategoryPage({ category, services, categoryPages, apiState, cartIds, addToCart, removeFromCart }) {
   const [query, setQuery] = useState('');
+  const [subcategory, setSubcategory] = useState('All services');
+  const groupInfo = categoryPages.find((item) => item.id === category);
   const categoryInfo = categoryPages.find((item) => item.name === category);
-  const items = servicesForCategory(services, category);
-  const filtered = items.filter((service) => `${service.name} ${service.description}`.toLowerCase().includes(query.toLowerCase().trim()));
+  const groupId = groupInfo?.id || categoryInfo?.id || category;
+  const items = servicesForCategory(services, groupId);
+  const subcategories = [...new Set(items.map((service) => service.subcategory).filter(Boolean))];
+  const filtered = items.filter((service) => `${service.name} ${service.description} ${service.subcategory || ''}`.toLowerCase().includes(query.toLowerCase().trim())
+    && (subcategory === 'All services' || service.subcategory === subcategory));
+  const title = groupInfo?.name || categoryInfo?.name || category;
+  const imageCategory = groupInfo?.imageCategory || categoryInfo?.imageCategory || category;
   return <main id="main" className="inner-page">
-    <section className="category-hero section-shell"><div><p className="eyebrow">Service category</p><h1>{category}</h1><p className="page-heading-copy">{categoryInfo?.description}</p><RouteLink className="button button-dark" to="/book">Check online booking <Arrow /></RouteLink></div><CategoryVisual category={category} priority /></section>
+    <section className="category-hero section-shell"><div><p className="eyebrow">Service category</p><h1>{title}</h1><p className="page-heading-copy">{groupInfo?.description || categoryInfo?.description}</p><RouteLink className="button button-dark" to="/book">Review your cart <Arrow /></RouteLink></div><CategoryVisual category={imageCategory} priority /></section>
     <section className="service-list-section section-shell">
-      <div className="service-list-heading"><div><p className="eyebrow">The menu</p><h2>{category}<br /><em>services.</em></h2><p>{items.length} menu item{items.length === 1 ? '' : 's'}</p></div>
-        {items.length > 5 && <label className="service-search">Search this menu<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" /></label>}
+      <div className="service-list-heading"><div><p className="eyebrow">The menu</p><h2>{title}<br /><em>services.</em></h2><p>{items.length} menu item{items.length === 1 ? '' : 's'}</p></div>
+        <label className="service-search">Search this menu<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" /></label>
       </div>
+      {subcategories.length > 1 && <nav className="service-filter-list" aria-label={`Filter ${title} services`}>
+        {['All services', ...subcategories].map((item) => <button key={item} type="button" className={subcategory === item ? 'service-filter is-active' : 'service-filter'} aria-pressed={subcategory === item} onClick={() => setSubcategory(item)}>{item}</button>)}
+      </nav>}
       {apiState === 'loading' && <p className="api-note" role="status">Preparing the service menu…</p>}
       {apiState === 'fallback' && <p className="api-note" role="alert">The service menu is temporarily unavailable. Please contact the studio.</p>}
       {apiState === 'ready' && filtered.length > 0 && <div className="service-list-grid">{filtered.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>}
       {apiState === 'ready' && filtered.length === 0 && <p className="api-note">{items.length ? 'No services match this search.' : 'No services are currently listed in this category.'}</p>}
-      <p className="placeholder-note">Prices are shown as supplied by the studio. Offer terms and package inclusions will be added later; those services will remain unavailable for online booking until confirmed.</p>
-      <RouteLink className="button button-dark" to="/book">Check online booking <Arrow /></RouteLink>
+      <p className="placeholder-note">Prices are shown as supplied by the studio. Service durations are still being confirmed, so services cannot be booked or paid for online yet. Offer terms and package inclusions also remain under review.</p>
+      {groupId === 'beauty' && <p className="placeholder-note">The supplied menu names this section “Beauty services” without stating its customer audience. The studio can confirm whether these services are for women, men, or all customers.</p>}
+      <RouteLink className="button button-dark" to="/book">Open your cart <Arrow /></RouteLink>
     </section>
   </main>;
 }
-
 function StoryPage({ salon }) {
   return <main id="main" className="inner-page"><section className="story-hero section-shell"><PageHeading eyebrow="The studio" title="The Dream" accent="Beauty Studio." copy={`${salon.name} is a unisex salon in ${salon.neighborhood}. The studio’s menu includes hair, beauty, and grooming services.`} /><CategoryVisual category="Women's hair" priority /></section>
     <section className="story-copy section-shell"><p className="eyebrow">A note about the studio</p><div><h2>Here in<br /><em>Karanjade.</em></h2><div><p>The salon is located near College Phata on Uran Road, in Karanjade, Navi Mumbai. The service pages share the menu details provided by the studio.</p><p>Further details about the team and salon history can be added when the studio supplies them.</p><RouteLink className="text-link" to="/visit-us">Find the studio <Arrow /></RouteLink></div></div></section>
@@ -372,7 +386,7 @@ function NotFoundPage({ salon }) {
 
 export default function App() {
   const [pathname, setPathname] = useState(window.location.pathname);
-  const { salon, services, apiState } = useSalonData();
+  const { salon, services, categoryPages, apiState } = useSalonData();
   const [cartIds, setCartIds] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('salon_service_cart') || '[]');
@@ -416,16 +430,30 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const detail = route.type === 'category' ? route.category : routeTitles[route.type] ?? 'Home';
+    const category = route.type === 'category' ? categoryPages.find((item) => item.id === route.category) : null;
+    const detail = category ? `${category.name} services` : routeTitles[route.type] ?? 'Home';
     document.title = `${detail} | ${salon.name}`;
-  }, [route.type, route.category, salon.name]);
+    const descriptions = {
+      home: `${salon.name} in Karanjade, Navi Mumbai. Browse salon services, prices, directions, and contact details.`,
+      services: `Browse the women’s, men’s, and beauty service menus at ${salon.name} in Karanjade.`,
+      story: `${salon.name} is a hair, beauty, and grooming studio in Karanjade, Navi Mumbai.`,
+      visit: `Find ${salon.name} in Karanjade, Navi Mumbai, and view its hours and contact details.`,
+      book: `Review your service cart and check online booking readiness for ${salon.name}.`,
+    };
+    const metaDescription = document.querySelector('meta[name="description"]') || document.head.appendChild(Object.assign(document.createElement('meta'), { name: 'description' }));
+    metaDescription.content = category
+      ? `Browse ${category.name.toLowerCase()} services and prices at ${salon.name} in Karanjade, Navi Mumbai.`
+      : descriptions[route.type] || `Services and visit information for ${salon.name} in Karanjade, Navi Mumbai.`;
+    const canonical = document.querySelector('link[rel="canonical"]') || document.head.appendChild(Object.assign(document.createElement('link'), { rel: 'canonical' }));
+    canonical.href = new URL(category?.path || route.path, window.location.origin).href;
+  }, [route.type, route.category, salon.name, categoryPages]);
 
   let page;
   switch (route.type) {
-    case 'home': page = <HomePage salon={salon} services={services} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
+    case 'home': page = <HomePage salon={salon} services={services} categoryPages={categoryPages} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
     case 'story': page = <StoryPage salon={salon} />; break;
-    case 'services': page = <ServicesPage services={services} />; break;
-    case 'category': page = <ServiceCategoryPage category={route.category} services={services} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
+    case 'services': page = <ServicesPage services={services} categoryPages={categoryPages} />; break;
+    case 'category': page = <ServiceCategoryPage category={route.category} services={services} categoryPages={categoryPages} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
     case 'visit': page = <VisitPage salon={salon} />; break;
     case 'book': page = <BookPage salon={salon} services={services} cartIds={cartIds} onRemoveFromCart={removeFromCart} onBrowseServices={() => navigate('/services')} />; break;
     default: page = <NotFoundPage salon={salon} />;

@@ -1,5 +1,7 @@
 # Menu data review
 
+> This file preserves the source transcription and PDF page reconciliation. For the current full 200-service catalog, current booking flags, missing prices, owner confirmations, and duration status, see [SERVICE_DATA_REVIEW.md](SERVICE_DATA_REVIEW.md). This newer report supersedes the older arrival-only booking notes below.
+
 ## Source status
 
 The salon supplied `docs/source-material/salon services.pdf`. It contains 18 image-only pages, so the text is not machine-searchable. All pages were visually reviewed. Pages 4 and 5 repeat the facial and cleanup sections from pages 1 and 2 with handwritten edits. Several other pages also have handwritten, crossed-out, or overwritten prices that do not identify a clear final amount.
@@ -14,7 +16,7 @@ The PDF contains a much broader menu than the 31 items transcribed in chat. The 
 - Offers and package details are deferred. Those rows may remain on the public browsing menu, but must stay unavailable for online booking until the offer price/terms or package contents are approved.
 - Charge a fixed ₹100 online advance for every booked service. If the service price is below ₹100, the studio returns the difference in cash after service. If the service is more than ₹100, the remaining amount is due at the salon.
 - Online booking may start with a selected set of fully approved services. Confirmed services do not have to wait for every deferred or unreadable menu row.
-- The customer selects a service, date, and 15-minute arrival time. The selected time is for arrival; service begins when the salon team is available. No service duration or employee roster is required.
+- The current booking implementation requires an approved positive duration and qualified staff schedule for each service offered online. The customer chooses an appointment start time; the server automatically assigns one eligible employee for the cart. The customer does not choose a staff member.
 
 ## What “customer-facing name” means
 
@@ -43,7 +45,7 @@ The PDF confirms the WhatsApp number already supplied and provides the Plot No. 
 
 ## Handwritten prices transcribed to the site
 
-The 16 handwritten amounts below were legible in the older PDF and were added as individual menu entries. The original 31 chat-supplied menu entries remain in place. Some source rows may be selected for booking when the price is known and wording is clear; service duration is not required.
+The 16 handwritten amounts below were legible in the older PDF and were added as individual menu entries. The original 31 chat-supplied menu entries remain in place. A service can be browsed with a known price, but online booking also requires confirmed wording/inclusions, an approved duration, and an eligible staff schedule. See `SERVICE_DATA_REVIEW.md` for current status.
 
 | PDF page | Individual service | Handwritten price |
 |---:|---|---:|
@@ -66,7 +68,7 @@ The 16 handwritten amounts below were legible in the older PDF and were added as
 
 ### Newer handwritten photo prices added to the website
 
-All entries in this list are visible in the public menu. Services with a known positive price and clear wording are available in the booking selector without a duration or staff-roster check. Names follow the handwritten labels as closely as possible; rows with meaning/name confirmation flags remain outside checkout.
+All entries in this list are visible in the public menu. Services with a known positive price and clear wording can be browsed and added to the cart, but remain unavailable for online booking until a positive duration and an eligible employee schedule are approved. Names follow the handwritten labels as closely as possible; rows with meaning/name confirmation flags remain outside checkout.
 
 | Section | Services and prices transcribed from the five newer photos |
 |---|---|
@@ -129,11 +131,11 @@ The fixed-price entries have no separate original/list price or offer terms in t
 
 1. Please confirm these newer-photo readings when convenient: whether the hair-spa label "Caring" is the correct service name; what the men's "Brand colour" at ₹150 means; whether "Treatment hair wash" at ₹900 is the exact service name; whether "Korean Glass" is the intended facial name; and whether Korean bleach for half tummy is ₹900. Those specific rows are marked as needing confirmation.
 2. Should the other untranscribed PDF services be added to the website? They include additional facials, cleanups, body polishing, massage, colour, laser, microblading, IV drips, and device-based treatments.
-3. No duration or staff roster is needed for online arrival-time bookings.
+3. Provide approved durations for each service intended for online booking, plus the employee roster, each employee's service eligibility, weekly hours, breaks, leave, and blocked time. Customers do not choose an employee; the server assigns one automatically.
 4. Offers are deferred. Before an offer service becomes bookable, provide its final price, conditions, and dates.
 5. Please confirm only the unclear names/package inclusions for services selected for booking, especially “03”, “Been”, “Poligen”, “Hair Cut Hair wish”, and combined manicure/pedicure entries.
 6. If any service's accepted price depends on hair length, product quantity, or consultation, provide the exact wording guests should see. All fixed prices supplied so far remain as given.
 
 ## Safe update workflow
 
-Handwritten prices confirmed by the salon and legible in the PDF or newer photos are included as service entries above. Where a newer photo clearly updates an existing service, it replaces the older price. Do not guess obscured PDF amounts or assign an individual rate to a differently named package. Duration values may remain null. Services with a known positive price and clear wording can be bookable without employee qualification checks; unresolved names, offers, packages, and unreadable prices stay out of checkout until clarified.
+Handwritten prices confirmed by the salon and legible in the PDF or newer photos are included as service entries above. Where a newer photo clearly updates an existing service, it replaces the older price. Do not guess obscured PDF amounts or assign an individual rate to a differently named package. Duration values may remain null for browsing, but a service cannot be booked until its approved duration and qualified staff coverage are configured. Unresolved names, offers, packages, and unreadable prices stay out of checkout until clarified.

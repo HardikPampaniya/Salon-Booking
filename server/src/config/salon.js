@@ -32,24 +32,87 @@ export const salon = {
   },
 };
 
-// Booking reserves an arrival time without assigning an employee or estimating service duration.
-// A service can be selected when its displayed price is known and its wording needs no confirmation.
-const service = (id, category, name, priceDisplay, description, priceRupees = null, needsConfirmation = false) => ({
+export const serviceMenuGroups = [
+  {
+    id: 'women',
+    label: 'Women',
+    path: '/services/women',
+    description: 'Hair, styling, colour, and treatments listed for women in the salon menu.',
+    imageCategory: "Women's hair",
+    audienceConfirmed: true,
+  },
+  {
+    id: 'men',
+    label: 'Men',
+    path: '/services/men',
+    description: 'Haircuts, beard care, colour, skin, and grooming services listed for men.',
+    imageCategory: "Men's services",
+    audienceConfirmed: true,
+  },
+  {
+    id: 'beauty',
+    label: 'Beauty services',
+    path: '/services/beauty',
+    description: 'Facials, waxing, threading, nails, and other beauty services from the supplied menu.',
+    imageCategory: 'Beauty services',
+    audienceConfirmed: false,
+  },
+];
+
+function serviceNavigation(category, name) {
+  const groupId = category === "Women's hair" ? 'women'
+    : category === "Men's services" ? 'men'
+      : 'beauty';
+  const normalized = name.toLowerCase();
+  let subcategory;
+  if (groupId === 'women') {
+    if (/colour|color|highlight|balayage/.test(normalized)) subcategory = 'Hair colour';
+    else if (/spa/.test(normalized)) subcategory = 'Hair spa';
+    else if (/treatment|keratin|smooth|botox|nano|bio|dandruff|conditioning|protein|karasmooth/.test(normalized)) subcategory = 'Hair treatments';
+    else if (/massage/.test(normalized)) subcategory = 'Hair massage';
+    else subcategory = 'Haircuts, styling & wash';
+  } else if (groupId === 'men') {
+    if (/facial|d-tan|dtan|skin/.test(normalized)) subcategory = 'Facials & skin care';
+    else if (/colour|color|highlight|frosting/.test(normalized)) subcategory = 'Hair colour';
+    else if (/spa|treatment|keratin|smooth|botox|nano|dandruff|protein/.test(normalized)) subcategory = 'Hair treatments';
+    else subcategory = 'Haircuts, beard & grooming';
+  } else if (/thread|eyebrow/.test(normalized)) subcategory = 'Threading';
+  else if (/wax/.test(normalized)) subcategory = 'Waxing';
+  else if (/manicure|pedicure|meni|pedi|nail/.test(normalized)) subcategory = 'Manicure & pedicure';
+  else if (/cleanup|clean-up/.test(normalized)) subcategory = 'Clean-ups';
+  else if (/polish|bleach|d-tan|dtan|massage|laser|microblading|\biv\b/.test(normalized)) subcategory = 'Body care';
+  else subcategory = 'Facials & skin care';
+  return { groupId, subcategory };
+}
+
+// Menu selection is separate from booking readiness: a priced, clear service may
+// be added to the cart, but booking also needs an approved duration and eligible staff.
+const service = (id, category, name, priceDisplay, description, priceRupees = null, needsConfirmation = false) => {
+  const { groupId, subcategory } = serviceNavigation(category, name);
+  const durationMinutes = null;
+  const active = true;
+  const menuSelectable = active && Number.isFinite(priceRupees) && priceRupees > 0 && !needsConfirmation;
+  return {
   id,
   category,
+  groupId,
+  subcategory,
+  active,
+  menuSelectable,
   name,
   description,
   priceDisplay,
   priceRupees,
-  durationMinutes: null,
-  bookable: Number.isFinite(priceRupees) && priceRupees > 0 && !needsConfirmation,
+  durationMinutes,
+  bookable: menuSelectable && Number.isInteger(durationMinutes) && durationMinutes > 0,
   isPlaceholder: false,
   needsConfirmation,
-});
+  };
+};
 
 export const services = [
-  service('women-hair-wash-blowdry', "Women's hair", 'Hair wash + blow-dry (any style)', '₹349', 'Price supplied by the salon.', 349),
-  service('women-haircut-wash', "Women's hair", 'Haircut + hair wash', '₹499', 'Price supplied by the salon.', 499),
+  service('women-hair-wash-blowdry', "Women's hair", 'Hair wash + blow-dry (any style)', '₹349', 'Confirm whether “Blow” and “Blowdry” are separate inclusions and which styling is included.', 349, true),
+  service('women-haircut-wash', "Women's hair", 'Haircut + hair wash', '₹499', 'Confirm the supplied “Hair Cut Hair wish” wording and whether hair wash is included.', 499, true),
   service('women-keratin', "Women's hair", 'Keratin treatment', '₹2,499', 'Price supplied by the salon.', 2499),
   service('women-smoothening', "Women's hair", 'Smoothening', '₹2,999', 'Price supplied by the salon.', 2999),
   service('women-botox', "Women's hair", 'Botox treatment', '30% off · final price to confirm', 'Offer supplied as a percentage discount; base price and offer period are not yet confirmed.', null, true),
@@ -66,12 +129,12 @@ export const services = [
   service('women-temporary-curls', "Women's hair", 'Temporary curls', '₹800', 'Price supplied by the salon.', 800),
   service('women-only-hair-dry', "Women's hair", 'Hair dry only', '₹350', 'Price supplied by the salon.', 350),
 
-  service('beauty-mani-pedi', 'Beauty services', 'Manicure + pedicure', '₹1,199', 'Complimentary eyebrow service included, as supplied.', 1199),
+  service('beauty-mani-pedi', 'Beauty services', 'Manicure + pedicure', '₹1,199', 'Confirm whether both manicure and pedicure are included and the complimentary eyebrow service wording.', 1199, true),
   service('beauty-mani-pedi-spa-cleanup', 'Beauty services', 'Manicure + pedicure + hair spa / clean-up', '₹2,499', 'The supplied menu lists “Hair Spa / clean-Up” in this package; confirm inclusions.', 2499, true),
   service('beauty-o3-facial-package', 'Beauty services', '“03” facial + manicure + pedicure + full-hand / half-leg wax', '₹2,999', 'Service wording and package inclusions need confirmation.', 2999, true),
-  service('beauty-hydra-facial', 'Beauty services', 'Hydra facial', '₹1,499', 'Price supplied by the salon.', 1499),
+  service('beauty-hydra-facial', 'Beauty services', 'Hydra facial', '₹1,499', 'Confirm this is the ₹1,499 Hydra facial, distinct from the ₹3,499 Hydra facial with machine in the newer photo and other PDF Hydra entries.', 1499, true),
   service('beauty-baby-glow-poligen', 'Beauty services', 'Baby Glow Poligen (skin booster treatment)', '₹1,999', 'Supplied as “Skin Bosten treatment”; confirm spelling and treatment description.', 1999, true),
-  service('beauty-rica-wax', 'Beauty services', 'Rica wax: full hand + full leg + underarms', '₹1,499', 'Complimentary eyebrow service included, as supplied.', 1499),
+  service('beauty-rica-wax', 'Beauty services', 'Rica wax: full hand + full leg + underarms', '₹1,499', 'Confirm whether full hand, full leg, and underarms are all included in this package, and confirm the complimentary eyebrow wording.', 1499, true),
   service('beauty-been-face-wax', 'Beauty services', '“Been” face wax', '₹499', 'Confirm the supplied service wording and wax area.', 499, true),
   service('beauty-03-face-wax', 'Beauty services', '“03” face wax', '₹699', 'Confirm the supplied service wording and wax area.', 699, true),
   service('beauty-threading-forehead', 'Beauty services', 'Threading: forehead', '₹30', 'Price supplied by the salon.', 30),
@@ -87,15 +150,15 @@ export const services = [
   service('beauty-rica-underarms-wax', 'Beauty services', 'Face wax: underarms', '₹200', 'Price supplied by the salon.', 200),
 
   service('men-haircut-beard-wash', "Men's services", 'Haircut + beard + hair wash', '₹249', 'Price supplied by the salon.', 249),
-  service('men-haircut-beard-dtan', "Men's services", 'Haircut + beard + D-tan', '₹399', 'Price supplied by the salon.', 399),
+  service('men-haircut-beard-dtan', "Men's services", 'Haircut + beard + D-tan', '₹399', 'Confirm the D-tan area and that haircut, beard, and D-tan are all included.', 399, true),
   service('men-haircut-beard-spa', "Men's services", 'Haircut + beard + hair spa', '₹699', 'Price supplied by the salon.', 699),
   service('men-haircut-beard-dandruff', "Men's services", 'Haircut + beard + dandruff treatment', '₹799', 'Price supplied by the salon.', 799),
   service('men-haircut-beard-mani-pedi', "Men's services", 'Haircut + beard + manicure / pedicure', '₹999', 'Confirm whether both manicure and pedicure are included.', 999, true),
-  service('men-haircut-beard-colour', "Men's services", 'Haircut + beard + colour', '₹799', 'Price supplied by the salon.', 799),
+  service('men-haircut-beard-colour', "Men's services", 'Haircut + beard + colour', '₹799', 'Confirm what colour service/product is included and that haircut, beard, and colour are all included.', 799, true),
   service('men-haircut-shave-head-massage', "Men's services", 'Haircut + shaving + head massage', '₹349', 'Price supplied by the salon.', 349),
-  service('men-aroma-facial-dtan', "Men's services", 'Aroma facial + D-tan', '₹699', 'Price supplied by the salon.', 699),
+  service('men-aroma-facial-dtan', "Men's services", 'Aroma facial + D-tan', '₹699', 'The source uses a slash; confirm whether this includes both Aroma facial and D-tan or is a choice of either one.', 699, true),
   service('men-03-facial-dtan', "Men's services", '“03” facial + D-tan', '₹1,899', 'Confirm the supplied facial name and package inclusions.', 1899, true),
-  service('men-hydra-facial', "Men's services", 'Hydra facial', '₹1,499', 'Price supplied by the salon.', 1499),
+  service('men-hydra-facial', "Men's services", 'Hydra facial', '₹1,499', 'Confirm this is the ₹1,499 Hydra facial and identify whether it differs from the other PDF Hydra entries.', 1499, true),
   service('men-keratin', "Men's services", 'Keratin treatment', '₹1,000', 'Price supplied by the salon.', 1000),
   service('men-botox-protein', "Men's services", 'Botox / protein treatment', '₹2,499', 'Confirm whether this is one choice of treatment or a combined service.', 2499, true),
 ];

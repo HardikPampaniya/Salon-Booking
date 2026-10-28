@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## 2026-10-29 — local changes, not yet deployed
+
+- Organized the 200-service catalog into Women, Men, and Beauty services groups with subcategories, search/filter navigation, and category routes; preserved catalog IDs and prices. Beauty remains separate from Unisex until the owner confirms its audience.
+- Added `SERVICE_DATA_REVIEW.md` with all catalog entries, current amounts, menu selection/booking state, durations, source notes, and confirmation questions. Four discount-only items still lack a payable price; all 200 durations remain unset.
+- Added multi-service availability based on one automatically assigned employee who is eligible for every cart item. Appointment intervals include combined approved durations and respect staff/salon hours, breaks, leave, blocked periods, existing bookings, and active holds.
+- Uses unique per-employee 15-minute lock segments so different employees can serve overlapping appointments while the same employee cannot be double-booked.
+- Kept the fixed ₹100 advance server-created and linked to a booking hold; removed the standalone Razorpay Payment Button that was unrelated to the selected cart and time.
+- Added `RAZORPAY_SETUP_GUIDE.md`; updated project, API, deployment, maintenance, and manual QA documentation for the current duration/staff-aware flow.
+- Public booking remains disabled. Provider-backed checkout/refund/webhook and browser visual QA require isolated staging and account setup; this change has not been pushed to Render.
+
+## Earlier changes (historical; later entries supersede older behavior descriptions)
 
 - Replaced the cart's full-page 15-minute arrival-time grid with a compact selector and scrollable modal; updated directions to the salon's supplied Maps link and changed Call the studio to the supplied WhatsApp number.
 - Added WhatsApp Cloud API booking confirmations for the salon owner and optionally opted-in customer after captured payment; added approved-template variables, persistent consent evidence, readiness settings, and no-blind-retry manual review behavior.

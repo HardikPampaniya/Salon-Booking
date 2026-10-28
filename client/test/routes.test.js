@@ -9,8 +9,8 @@ import { normalizePath, resolveRoute, servicesForCategory, siteRoutes } from '..
 test('registers each requested page with unique paths', () => {
   const paths = siteRoutes.map((route) => route.path);
   assert.deepEqual(paths, [
-    '/', '/our-story', '/services', '/services/womens-hair', '/services/beauty',
-    '/services/mens', '/visit-us', '/book',
+    '/', '/our-story', '/services', '/services/women', '/services/men', '/services/beauty',
+    '/services/womens-hair', '/services/mens', '/visit-us', '/book',
   ]);
   assert.equal(new Set(paths).size, paths.length);
 });
@@ -22,10 +22,12 @@ test('normalizes trailing slashes without changing the root path', () => {
   assert.equal(normalizePath(''), '/');
 });
 
-test('resolves the three menu categories and booking page', () => {
-  assert.deepEqual(resolveRoute('/services/womens-hair').category, "Women's hair");
-  assert.deepEqual(resolveRoute('/services/beauty').category, 'Beauty services');
-  assert.deepEqual(resolveRoute('/services/mens').category, "Men's services");
+test('resolves the new menu groups and preserves earlier category URLs', () => {
+  assert.equal(resolveRoute('/services/women').category, 'women');
+  assert.equal(resolveRoute('/services/men').category, 'men');
+  assert.equal(resolveRoute('/services/beauty').category, 'beauty');
+  assert.equal(resolveRoute('/services/womens-hair').category, 'women');
+  assert.equal(resolveRoute('/services/mens').category, 'men');
   assert.equal(resolveRoute('/book').type, 'book');
 });
 
@@ -35,12 +37,13 @@ test('returns a not-found route for paths outside the site map', () => {
 
 test('filters service data using the configured category label', () => {
   const services = [
-    { id: 'a', category: "Women's hair" },
-    { id: 'b', category: 'Beauty services' },
-    { id: 'c', category: "Women's hair" },
+    { id: 'a', category: "Women's hair", groupId: 'women' },
+    { id: 'b', category: 'Beauty services', groupId: 'beauty' },
+    { id: 'c', category: "Women's hair", groupId: 'women' },
   ];
+  assert.deepEqual(servicesForCategory(services, 'women').map(({ id }) => id), ['a', 'c']);
   assert.deepEqual(servicesForCategory(services, "Women's hair").map(({ id }) => id), ['a', 'c']);
-  assert.deepEqual(servicesForCategory(services, 'Men\'s services'), []);
+  assert.deepEqual(servicesForCategory(services, 'men'), []);
 });
 
 test('image mappings use descriptive alt text and never reference a missing local file', () => {

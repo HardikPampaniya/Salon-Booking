@@ -7,7 +7,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
 import { z } from 'zod';
-import { buildArrivalTimes, getDailyScheduleWindow } from './booking/availability.js';
+import { buildStaffAvailability, getDailyScheduleWindow } from './booking/availability.js';
 import {
   bookingReadiness,
   cancelManagedBooking,
@@ -16,13 +16,28 @@ import {
   processRazorpayWebhook,
   verifyCheckoutPayment,
 } from './booking/workflows.js';
-import { salon, services } from './config/salon.js';
-import { ArrivalReservation } from './models/ArrivalReservation.js';
+import { salon, serviceMenuGroups, services } from './config/salon.js';
+import { Staff } from './models/Staff.js';
+import { SlotReservation } from './models/SlotReservation.js';
 
 const availabilityQuerySchema = z.object({
-  serviceId: z.string().min(1).max(80),
+  serviceId: z.string().min(1).max(80).optional(),
+  serviceIds: z.union([
+    z.string().min(1).max(80),
+    z.array(z.string().min(1).max(80)).min(1).max(20),
+  ]).optional(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
+}).superRefine((value, context) => {
+  const ids = value.serviceIds === undefined ? [] : Array.isArray(value.serviceIds) ? value.serviceIds : [value.serviceIds];
+  if (!ids.length && !value.serviceId) context.addIssue({ code: 'custom', message: 'Select at least one service.' });
+  if (ids.length && value.serviceId) context.addIssue({ code: 'custom', message: 'Use serviceId or serviceIds, not both.' });
+  if (new Set(ids.length ? ids : value.serviceId ? [value.serviceId] : []).size !== (ids.length || (value.serviceId ? 1 : 0))) {
+    context.addIssue({ code: 'custom', message: 'A service can only be selected once.' });
+  }
+}).transform(({ serviceId, serviceIds, date }) => ({
+  serviceIds: serviceIds === undefined ? [serviceId] : Array.isArray(serviceIds) ? serviceIds : [serviceIds],
+  date,
+}));
 
 const clientDist = fileURLToPath(new URL('../../client/dist/', import.meta.url));
 
@@ -111,7 +126,7 @@ export function createApp() {
   });
 
   app.get('/api/services', (_request, response) => {
-    response.json({ services });
+    response.json({ services, groups: serviceMenuGroups });
   });
 
   const bookingWriteLimit = rateLimit({ windowMs: 60_000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false });
@@ -146,18 +161,22 @@ export function createApp() {
       return response.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Provide a serviceId and a date in YYYY-MM-DD format.' } });
     }
 
-    const service = services.find(({ id }) => id === parsed.data.serviceId);
-    if (!service) {
-      return response.status(404).json({ error: { code: 'SERVICE_NOT_FOUND', message: 'That service is not available.' } });
+    const selectedServices = parsed.data.serviceIds.map((id) => services.find((service) => service.id === id));
+    if (selectedServices.some((service) => !service)) {
+      return response.status(404).json({ error: { code: 'SERVICE_NOT_FOUND', message: 'One or more selected services are not available.' } });
     }
 
     try {
       const { date } = parsed.data;
+      const ids = selectedServices.map(({ id }) => id);
       const schedule = salon.bookingSchedule;
-      if (schedule.isPlaceholder || service.bookable !== true || service.needsConfirmation === true
-        || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0) {
-        return response.status(503).json({ error: { code: 'BOOKING_SETUP_INCOMPLETE', message: 'This service is not yet approved for online booking.' } });
+      if (schedule.isPlaceholder || selectedServices.some((service) => service.active !== true || service.bookable !== true
+        || service.needsConfirmation === true || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0
+        || !Number.isInteger(service.durationMinutes) || service.durationMinutes < 1)) {
+        return response.status(503).json({ error: { code: 'BOOKING_SETUP_INCOMPLETE', message: 'One or more selected services are not yet approved for online booking.' } });
       }
+      const readiness = await bookingReadiness();
+      if (!readiness.enabled) return response.status(503).json({ error: { code: 'BOOKING_NOT_READY', message: 'Online booking is not ready; no reservable times are available yet.', issues: readiness.issues } });
       const now = new Date();
       const today = salonDateString(now, salon.timezone);
       const maxDaysAhead = Number(process.env.MAX_BOOKING_DAYS_AHEAD || 60);
@@ -173,35 +192,64 @@ export function createApp() {
         weeklyHours: schedule.weeklyHours,
         timezone: salon.timezone,
       });
-      const arrivals = buildArrivalTimes({
+      if (dailyWindow.closed) {
+        return response.json({
+          services: selectedServices.map(({ id, name, priceRupees, durationMinutes }) => ({ id, name, priceRupees, durationMinutes })),
+          date,
+          timezone: salon.timezone,
+          closed: true,
+          visitHours: null,
+          slots: [],
+          isPlaceholderSchedule: schedule.isPlaceholder,
+        });
+      }
+      const totalDurationMinutes = selectedServices.reduce((total, service) => total + service.durationMinutes, 0);
+      const staffMembers = await Staff.find({ active: true, serviceIds: { $all: ids } }).lean();
+      if (!staffMembers.length) return response.status(503).json({ error: { code: 'STAFF_UNAVAILABLE', message: 'No team member is configured for all selected services.' } });
+      const staffIds = staffMembers.map((member) => member._id);
+      const occupiedRows = await SlotReservation.find({
+        staffId: { $in: staffIds },
+        slotAt: { $gte: dailyWindow.openingAt, $lt: dailyWindow.closingAt },
+        $or: [
+          { status: 'confirmed' },
+          { status: 'held', expiresAt: { $gt: now } },
+        ],
+      }).select('staffId slotAt').lean();
+      const intervalMinutes = schedule.slotIntervalMinutes;
+      const occupiedBookings = occupiedRows.map(({ staffId, slotAt }) => ({
+        staffId,
+        startAt: slotAt,
+        endAt: new Date(new Date(slotAt).getTime() + intervalMinutes * 60_000),
+      }));
+      const availability = buildStaffAvailability({
         date,
         timezone: salon.timezone,
-        weeklyHours: schedule.weeklyHours,
-        intervalMinutes: schedule.slotIntervalMinutes,
+        salonWeeklyHours: schedule.weeklyHours,
+        salonBreaks: schedule.breaks,
+        salonBlockedPeriods: schedule.blockedPeriods,
+        staffMembers,
+        serviceIds: ids,
+        serviceDurationMinutes: totalDurationMinutes,
+        slotIntervalMinutes: intervalMinutes,
+        occupiedBookings,
         after: now,
       });
-      const occupied = mongoose.connection.readyState === 1
-        ? await ArrivalReservation.find({
-          visitDate: date,
-          $or: [
-            { status: 'confirmed' },
-            { status: 'held', expiresAt: { $gt: now } },
-          ],
-        }).select('slotAt').lean()
-        : [];
-      const occupiedTimes = new Set(occupied.map(({ slotAt }) => new Date(slotAt).getTime()));
-      const availableArrivalTimes = arrivals.slots.filter(({ startAt }) => !occupiedTimes.has(new Date(startAt).getTime()));
+      const availableSlots = availability.slots.map(({ staffOptions, ...slot }) => ({
+        ...slot,
+        availableStaffCount: staffOptions.length,
+      }));
 
       return response.json({
-        service: { id: service.id, name: service.name, priceRupees: service.priceRupees },
+        services: selectedServices.map(({ id, name, priceRupees, durationMinutes }) => ({ id, name, priceRupees, durationMinutes })),
+        durationMinutes: totalDurationMinutes,
         date,
         timezone: salon.timezone,
-        closed: dailyWindow.closed,
-        visitHours: dailyWindow.closed ? null : {
+        closed: false,
+        visitHours: {
           open: formatClock(dailyWindow.openMinute),
           close: formatClock(dailyWindow.closeMinute),
         },
-        slots: availableArrivalTimes,
+        slots: availableSlots,
         isPlaceholderSchedule: schedule.isPlaceholder,
       });
     } catch (error) {

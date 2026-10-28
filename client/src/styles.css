@@ -343,6 +343,10 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .service-search { display: flex; flex-direction: column; gap: 7px; width: min(100%, 250px); color: #665950; font-size: 10px; font-weight: 600; }
 .service-search input { min-height: 42px; border: 1px solid #d3c6ba; padding: 0 12px; background: #fbf9f5; color: var(--ink); font: 12px "DM Sans", sans-serif; }
 .service-search input:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
+.service-filter-list { display: flex; flex-wrap: wrap; gap: 8px; margin: -14px 0 27px; }
+.service-filter { min-height: 36px; padding: 0 13px; border: 1px solid #cdbfb3; border-radius: 999px; background: #f8f4ee; color: #665950; font: 500 10px "DM Sans", sans-serif; cursor: pointer; }
+.service-filter:hover, .service-filter.is-active { border-color: #58473e; background: #58473e; color: #fbf7f1; }
+.service-filter:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
 .service-list-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .service-list-grid .service-card { min-height: 206px; }
 .service-list-section > .placeholder-note { max-width: 760px; margin: 26px 0; color: #796d64; font-size: 11px; line-height: 1.8; }

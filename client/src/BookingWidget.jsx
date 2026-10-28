@@ -100,23 +100,6 @@ function isReadyToBook(service) {
     && service.priceRupees > 0;
 }
 
-function RazorpayPaymentButton() {
-  const formRef = useRef(null);
-
-  useEffect(() => {
-    const form = formRef.current;
-    if (!form || form.querySelector('script[data-payment_button_id="pl_TpMSC0xjEVMBYJ"]')) return undefined;
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/payment-button.js';
-    script.async = true;
-    script.setAttribute('data-payment_button_id', 'pl_TpMSC0xjEVMBYJ');
-    form.append(script);
-    return () => script.remove();
-  }, []);
-
-  return <form ref={formRef} className="cart-payment-form" aria-label="Razorpay ₹100 advance payment" />;
-}
-
 export default function BookingWidget({ salon, services, cartIds, onRemoveFromCart, onBrowseServices, forceClosed = false }) {
   const [readiness, setReadiness] = useState(null);
   const [date, setDate] = useState(() => defaultVisitDate(salon));
@@ -138,7 +121,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const cartServices = cartIds.map((id) => services.find((service) => service.id === id)).filter(Boolean);
   const cartIsComplete = cartIds.length > 0 && cartIds.length <= 20
     && cartServices.length === cartIds.length && cartServices.every(isReadyToBook);
-  const availabilityServiceId = cartIsComplete ? cartServices[0].id : '';
+  const availabilityServiceIds = cartIsComplete ? cartServices.map((service) => service.id).join(',') : '';
 
   useEffect(() => {
     let active = true;
@@ -148,7 +131,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   }, []);
 
   useEffect(() => {
-    if (forceClosed || !availabilityServiceId || !date) {
+    if (forceClosed || !availabilityServiceIds || !date) {
       setAvailability(null);
       setAvailabilityState('idle');
       return undefined;
@@ -157,7 +140,9 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     setAvailabilityState('loading');
     setStartAt('');
     setAvailability(null);
-    fetch(apiUrl(`/api/availability?serviceId=${encodeURIComponent(availabilityServiceId)}&date=${encodeURIComponent(date)}`), { signal: controller.signal })
+    const query = new URLSearchParams({ date });
+    availabilityServiceIds.split(',').forEach((id) => query.append('serviceIds', id));
+    fetch(apiUrl(`/api/availability?${query.toString()}`), { signal: controller.signal })
       .then(responseJson)
       .then((data) => {
         setAvailability(data);
@@ -170,7 +155,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         }
       });
     return () => controller.abort();
-  }, [forceClosed, availabilityServiceId, date]);
+  }, [forceClosed, availabilityServiceIds, date]);
 
   useEffect(() => {
     const dialog = timePickerRef.current;
@@ -283,12 +268,12 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           catch (error) { setMessage(error.message); }
           finally { setBusy(false); }
         },
-        modal: { ondismiss: () => setMessage('The payment window was closed. Your arrival time is held briefly; reopen checkout before the hold expires.') },
+        modal: { ondismiss: () => setMessage('The payment window was closed. Your appointment time is held briefly; reopen checkout before the hold expires.') },
       });
       checkout.on('payment.failed', (event) => setMessage(event.error?.description || 'Payment did not complete. You can try checkout again while the hold is active.'));
       checkout.open();
       setManaged({ booking: hold.booking, payment: { status: hold.payment.status }, refund: null });
-      setMessage(`Your arrival time is held for 10 minutes. Complete the ${formatMoney(ADVANCE_PAISE)} advance payment to confirm your visit.`);
+      setMessage(`Your appointment time is held for 10 minutes. Complete the ${formatMoney(ADVANCE_PAISE)} advance payment to confirm your visit.`);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -357,31 +342,33 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             <ul className="cart-items">{cartServices.map((service) => {
               const serviceReady = isReadyToBook(service);
               return <li className={`cart-item${serviceReady ? '' : ' is-unconfirmed'}`} key={service.id}>
-                <div><strong>{service.name}</strong><small>{serviceReady ? 'Price confirmed' : 'Price or details need confirmation'}</small></div>
+                <div><strong>{service.name}</strong><small>{serviceReady ? `${service.durationMinutes} minute visit · price confirmed` : !Number.isInteger(service.durationMinutes) || service.durationMinutes < 1 ? 'Visit duration needs confirmation' : 'Price or service details need confirmation'}</small></div>
                 <strong>{service.priceDisplay || (Number.isFinite(service.priceRupees) ? formatMoney(Math.round(service.priceRupees * 100)) : 'To confirm')}</strong>
                 <button type="button" className="cart-item-remove" onClick={() => onRemoveFromCart(service.id)} aria-label={`Remove ${service.name} from cart`}>Remove</button>
               </li>;
             })}</ul>
             <div className="cart-total-row"><span>{cartIsComplete ? 'Service total' : 'Confirmed price subtotal'}</span><strong>{formatMoney(servicePricePaise)}</strong></div>
-            {!cartIsComplete && <p className="cart-warning" role="status">One or more selected items need confirmed menu details before checkout. Remove them or choose other services.</p>}
+            {!cartIsComplete && <p className="cart-warning" role="status">Each service needs an approved price, clear menu details, and duration before a visit can be booked. You can still review your cart.</p>}
             <button type="button" className="text-link cart-browse-link" onClick={onBrowseServices}>Add another service <span aria-hidden="true">↗</span></button>
           </section> : <section className="cart-empty">
-            <span className="cart-empty-mark" aria-hidden="true">✳</span><h3>Your cart is ready for a service.</h3><p>Browse the menu, add the services you want, then return here to choose a visit date and arrival time.</p>
+            <span className="cart-empty-mark" aria-hidden="true">✳</span><h3>Your cart is ready for a service.</h3><p>Browse the menu, add the services you want, then return here to choose an appointment date and start time.</p>
             <button type="button" className="button button-dark" onClick={onBrowseServices}>Browse services <span aria-hidden="true">↗</span></button>
           </section>}
           {cartServices.length > 0 && <>
           <div className="booking-fields">
             <label>Choose a date
-              <input type="date" min={defaultVisitDate(salon)} max={addCalendarDays(salonDate(salon.timezone), 60)} value={date} onChange={(event) => setDate(event.target.value)} />
+              <input type="date" disabled={!cartIsComplete} min={defaultVisitDate(salon)} max={addCalendarDays(salonDate(salon.timezone), 60)} value={date} onChange={(event) => setDate(event.target.value)} />
             </label>
           </div>
-          {availability?.visitHours && <p className="booking-arrival-note">Arrival times are available from {availability.visitHours.open} to {availability.visitHours.close}. Your selected time is when to arrive; the service begins when a team member is available.</p>}
-          {readiness && !paymentEnabled && <p className="booking-arrival-note">These times follow the salon schedule. Your visit cannot be reserved until online checkout is enabled.</p>}
+          {!cartIsComplete && <p className="booking-arrival-note" role="status">Choose services with confirmed prices, clear details, and approved visit durations before selecting an appointment time.</p>}
+          {availability?.visitHours && <p className="booking-arrival-note">Appointment start times are available from {availability.visitHours.open} to {availability.visitHours.close}. A team member is assigned automatically for the full service duration.</p>}
+          {readiness && !paymentEnabled && <p className="booking-arrival-note">No appointment times can be reserved until online booking and checkout are enabled.</p>}
           <fieldset className="slot-picker">
-            <legend>Choose your arrival time</legend>
-            {availabilityState === 'loading' && <p role="status">Checking arrival times…</p>}
+            <legend>Choose your appointment start time</legend>
+            {!cartIsComplete && <p>Select services with approved durations to check reservable times.</p>}
+            {availabilityState === 'loading' && <p role="status">Checking appointment times…</p>}
             {availabilityState === 'closed' && <p>The studio is closed on this date. Please choose another day.</p>}
-            {availabilityState === 'empty' && <p>No later arrival times are available for this date. Try another day.</p>}
+            {availabilityState === 'empty' && <p>No appointment start times are available for this date. Try another day.</p>}
             {availabilityState === 'error' && <p role="alert">Arrival times are temporarily unavailable. Please try again.</p>}
             {availabilityState === 'ready' && <button
               ref={timePickerTriggerRef}
@@ -391,7 +378,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
               aria-expanded={timePickerOpen}
               onClick={() => setTimePickerOpen(true)}
             >
-              <span>{selectedArrival ? selectedArrival.time : 'Select an arrival time'}</span>
+              <span>{selectedArrival ? selectedArrival.time : 'Select an appointment time'}</span>
               <span>{selectedArrival ? 'Change time' : `${slots.length} times available`} <span aria-hidden="true">⌄</span></span>
             </button>}
           </fieldset>
@@ -403,24 +390,17 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             onClick={(event) => { if (event.target === timePickerRef.current) setTimePickerOpen(false); }}
           >
             <div className="slot-dialog-heading">
-              <div><p className="eyebrow">{formatVisitDate(date, salon.timezone)}</p><h3 id="slot-dialog-title">Choose your arrival time</h3></div>
-              <button className="slot-dialog-close" type="button" aria-label="Close arrival time choices" onClick={() => setTimePickerOpen(false)}>×</button>
+              <div><p className="eyebrow">{formatVisitDate(date, salon.timezone)}</p><h3 id="slot-dialog-title">Choose your appointment start time</h3></div>
+              <button className="slot-dialog-close" type="button" aria-label="Close appointment time choices" onClick={() => setTimePickerOpen(false)}>×</button>
             </div>
-            <p className="slot-dialog-note">Choose when you plan to arrive. The team will begin your services when available.</p>
+            <p className="slot-dialog-note">This is the appointment start time. The salon assigns an eligible team member automatically and reserves the full service duration.</p>
             <div className="slot-list">{slots.map((slot) => (
               <button className={startAt === slot.startAt ? 'slot-choice is-selected' : 'slot-choice'} type="button" key={slot.startAt} aria-pressed={startAt === slot.startAt} onClick={() => { setStartAt(slot.startAt); setTimePickerOpen(false); }}>
                 {slot.time}
               </button>
             ))}</div>
           </dialog>}
-          {selectedArrival && <p className="booking-arrival-note">Selected arrival: {formatVisitDate(date, salon.timezone)} at {selectedArrival.time}. Your services begin when the team is available.</p>}
-          {!paymentEnabled && cartIsComplete && selectedArrival && <section className="cart-payment-panel" aria-labelledby="cart-payment-title">
-            <p className="eyebrow">Razorpay payment</p>
-            <h3 id="cart-payment-title">Pay the ₹100 advance</h3>
-            <p>This fixed payment button collects ₹100 only. It does not send your selected services or arrival time to our booking system and does not reserve the slot. Please contact the studio to confirm your visit before paying, then share your Razorpay receipt with the team.</p>
-            <RazorpayPaymentButton />
-            <p>This manual payment button cannot trigger automatic booking confirmation or WhatsApp messages. The integrated checkout will replace it after the database and payment setup is ready.</p>
-          </section>}
+          {selectedArrival && <p className="booking-arrival-note">Selected appointment: {formatVisitDate(date, salon.timezone)} at {selectedArrival.time}. An eligible team member will be assigned automatically.</p>}
           {paymentEnabled ? <>
             <div className="booking-fields">
               <label>Your name
@@ -439,12 +419,12 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             </div>
             <label className="policy-consent">
               <input type="checkbox" checked={acceptedPolicy} onChange={(event) => setAcceptedPolicy(event.target.checked)} />
-              <span>I agree to the booking policy. The {formatMoney(ADVANCE_PAISE)} advance is for this visit and is credited against my service bill. If the combined services cost less than the advance, the studio returns the difference in cash after service. The selected time is my arrival time; services begin when the team is available. I can request a full refund of the captured advance if I cancel at least one hour before arrival.</span>
+              <span>I agree to the booking policy. The {formatMoney(ADVANCE_PAISE)} advance is for this visit and is credited against my service bill. If the combined services cost less than the advance, the studio returns the difference in cash after service. The selected time is the appointment start time, and an eligible team member is assigned automatically. I can request a full refund of the captured advance if I cancel at least one hour before the appointment.</span>
             </label>
             {cartIsComplete && <p className="advance-summary">Service total {formatMoney(servicePricePaise)} · Pay {formatMoney(ADVANCE_PAISE)} once online now · {changeReturnedAfterServicePaise > 0 ? `${formatMoney(changeReturnedAfterServicePaise)} change returned in cash after service.` : remainingBalancePaise > 0 ? `${formatMoney(remainingBalancePaise)} balance paid at the salon.` : 'Nothing more is due at the salon.'}</p>}
             <button className="button button-light booking-submit" type="button" disabled={!canSubmit} onClick={startCheckout}>{busy ? 'Please wait…' : 'Continue to secure payment'} <span aria-hidden="true">↗</span></button>
           </> : <div className="booking-unavailable" role="status">
-            <p>{readiness ? 'Online booking is still being prepared. Your selected services, date, and arrival time are not submitted or reserved by this page.' : 'Checking payment and booking setup…'}</p>
+            <p>{readiness ? 'Online booking is still being prepared. Your selected services, date, and appointment time are not submitted or reserved by this page.' : 'Checking payment and booking setup…'}</p>
             {salon.phone && <a className="button button-light" href={`tel:${salon.phone}`}>Call the studio</a>}
           </div>}
           </>}
@@ -454,13 +434,13 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       {message && <p className="booking-feedback" role="status">{message}</p>}
       {managed && <div className="booking-management" aria-live="polite">
         <p><strong>Booking {managed.booking.reference}</strong></p>
-        <p>Visit: {managed.booking.visitDate ? formatVisitDate(managed.booking.visitDate, managed.booking.salonTimezone) : ''}{managed.booking.startAt && <> · arrive at {new Intl.DateTimeFormat('en-IN', { timeZone: managed.booking.salonTimezone, timeStyle: 'short' }).format(new Date(managed.booking.startAt))}</>}</p>
+        <p>Appointment: {managed.booking.visitDate ? formatVisitDate(managed.booking.visitDate, managed.booking.salonTimezone) : ''}{managed.booking.startAt && <> · starts at {new Intl.DateTimeFormat('en-IN', { timeZone: managed.booking.salonTimezone, timeStyle: 'short' }).format(new Date(managed.booking.startAt))}</>}</p>
         {(managed.booking.services?.length ? managed.booking.services : [{ serviceName: managed.booking.serviceName, pricePaise: managed.booking.servicePricePaise }]).map((service) => <p key={service.serviceId || service.serviceName}>Service: <strong>{service.serviceName}</strong>{Number.isFinite(service.pricePaise) ? ` · ${formatMoney(service.pricePaise)}` : ''}</p>)}
-        <p>Service total: <strong>{formatMoney(managed.booking.servicePricePaise)}</strong>. Your selected time is your arrival time; services begin when the team is available.</p>
+        <p>Service total: <strong>{formatMoney(managed.booking.servicePricePaise)}</strong>{managed.booking.serviceDurationMinutes && <> · reserved time: <strong>{managed.booking.serviceDurationMinutes} minutes</strong></>}{managed.booking.staffName && <> · team member: <strong>{managed.booking.staffName}</strong></>}</p>
         <p>Booking status: <strong>{managed.booking.status.replaceAll('_', ' ')}</strong> · Payment status: <strong>{managed.payment?.status || 'not available'}</strong>{managed.refund && <> · Refund status: <strong>{managed.refund.status.replaceAll('_', ' ')}</strong></>}</p>
         {managed.booking.cancellationAllowed && !confirmingCancel && <button className="booking-cancel-link" type="button" onClick={() => setConfirmingCancel(true)}>Cancel this booking</button>}
-        {['held', 'confirmed'].includes(managed.booking.status) && !managed.booking.cancellationAllowed && <p>Online cancellation closes one hour before your selected arrival time. Please contact the studio for help.</p>}
-        {confirmingCancel && <div className="cancel-confirm"><p>Cancel the visit booking? Online cancellation is available until one hour before your arrival time. Any captured ₹100 advance will be refunded to the original payment method.</p><button type="button" className="button button-light" disabled={busy} onClick={cancelManaged}>Confirm cancellation</button><button type="button" className="booking-cancel-link" onClick={() => setConfirmingCancel(false)}>Keep booking</button></div>}
+        {['held', 'confirmed'].includes(managed.booking.status) && !managed.booking.cancellationAllowed && <p>Online cancellation closes one hour before your appointment start time. Please contact the studio for help.</p>}
+        {confirmingCancel && <div className="cancel-confirm"><p>Cancel the visit booking? Online cancellation is available until one hour before your appointment start time. Any captured ₹100 advance will be refunded to the original payment method.</p><button type="button" className="button button-light" disabled={busy} onClick={cancelManaged}>Confirm cancellation</button><button type="button" className="booking-cancel-link" onClick={() => setConfirmingCancel(false)}>Keep booking</button></div>}
       </div>}
     </div>
   );

@@ -12,6 +12,12 @@ const weeklyHours = [
   { open: '10:00', close: '19:00' },
 ];
 
+function staffWeeklyHours(mondayOpen = '10:00', mondayClose = '19:00') {
+  return weeklyHours.map((day, index) => index === 1
+    ? { open: mondayOpen, close: mondayClose }
+    : day ? { ...day } : null);
+}
+
 function build(overrides = {}) {
   return buildAvailabilitySlots({
     date: '2027-01-04',
@@ -67,9 +73,9 @@ describe('salon-local availability calculation', () => {
       timezone: 'Asia/Kolkata',
       salonWeeklyHours: weeklyHours,
       staffMembers: [
-        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'] },
-        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'] },
-        { id: 'staff-3', displayName: 'Facialist', active: true, serviceIds: ['signature-facial'] },
+        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() },
+        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() },
+        { id: 'staff-3', displayName: 'Facialist', active: true, serviceIds: ['signature-facial'], weeklyHours: staffWeeklyHours() },
       ],
       serviceId: 'cut-and-style',
       serviceDurationMinutes: 60,
@@ -85,8 +91,8 @@ describe('salon-local availability calculation', () => {
       timezone: 'Asia/Kolkata',
       salonWeeklyHours: weeklyHours,
       staffMembers: [
-        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'] },
-        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'] },
+        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() },
+        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() },
       ],
       serviceId: 'cut-and-style',
       serviceDurationMinutes: 60,
@@ -103,8 +109,8 @@ describe('salon-local availability calculation', () => {
       timezone: 'Asia/Kolkata',
       salonWeeklyHours: weeklyHours,
       staffMembers: [
-        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], leaveDates: ['2027-01-04'] },
-        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'], weeklyHours: [null, { open: '11:00', close: '17:00' }] },
+        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours(), leaveDates: ['2027-01-04'] },
+        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours('11:00', '17:00') },
       ],
       serviceId: 'cut-and-style',
       serviceDurationMinutes: 60,
@@ -120,12 +126,55 @@ describe('salon-local availability calculation', () => {
       timezone: 'Asia/Kolkata',
       salonWeeklyHours: weeklyHours,
       staffMembers: [
-        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: [null, { open: '09:00', close: '20:00' }] },
+        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours('09:00', '20:00') },
       ],
       serviceId: 'cut-and-style',
       serviceDurationMinutes: 60,
     });
     assert.equal(result.slots[0].time, '10:00 am');
     assert.equal(result.slots.at(-1).time, '6:00 pm');
+  });
+
+  it('omits appointment starts at or before the current instant', () => {
+    const result = buildStaffAvailability({
+      date: '2027-01-04',
+      timezone: 'Asia/Kolkata',
+      salonWeeklyHours: weeklyHours,
+      staffMembers: [{ id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() }],
+      serviceId: 'cut-and-style',
+      serviceDurationMinutes: 60,
+      after: new Date('2027-01-04T05:00:00.000Z'),
+    });
+    assert.equal(result.slots[0].time, '10:45 am');
+  });
+
+  it('assigns multi-service visits only to employees qualified for every selected service', () => {
+    const result = buildStaffAvailability({
+      date: '2027-01-04',
+      timezone: 'Asia/Kolkata',
+      salonWeeklyHours: weeklyHours,
+      staffMembers: [
+        { id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style', 'signature-facial'], weeklyHours: staffWeeklyHours() },
+        { id: 'staff-2', displayName: 'Stylist 2', active: true, serviceIds: ['cut-and-style'], weeklyHours: staffWeeklyHours() },
+      ],
+      serviceIds: ['cut-and-style', 'signature-facial'],
+      serviceDurationMinutes: 90,
+    });
+    const firstTime = result.slots.find((slot) => slot.time === '10:00 am');
+    assert.equal(firstTime.availableStaffCount, 1);
+    assert.deepEqual(firstTime.staffOptions.map(({ id }) => id), ['staff-1']);
+    assert.equal(new Date(firstTime.endAt) - new Date(firstTime.startAt), 90 * 60_000);
+  });
+
+  it('does not treat a missing employee weekly schedule as salon-wide availability', () => {
+    const result = buildStaffAvailability({
+      date: '2027-01-04',
+      timezone: 'Asia/Kolkata',
+      salonWeeklyHours: weeklyHours,
+      staffMembers: [{ id: 'staff-1', displayName: 'Stylist 1', active: true, serviceIds: ['cut-and-style'] }],
+      serviceId: 'cut-and-style',
+      serviceDurationMinutes: 60,
+    });
+    assert.deepEqual(result.slots, []);
   });
 });

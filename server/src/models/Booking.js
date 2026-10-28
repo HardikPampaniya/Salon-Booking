@@ -10,6 +10,9 @@ const bookingSchema = new mongoose.Schema({
     serviceId: { type: String, required: true },
     serviceName: { type: String, required: true },
     pricePaise: { type: Number, required: true, min: 0 },
+    // Optional so older arrival-time booking snapshots can still be managed;
+    // the current hold workflow always writes an approved positive duration.
+    durationMinutes: { type: Number, min: 1 },
   }],
   servicePricePaise: { type: Number, required: true, min: 0 },
   serviceDurationMinutes: { type: Number, min: 1 },

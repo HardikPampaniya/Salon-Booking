@@ -89,6 +89,15 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
   return aStart < bEnd && aEnd > bStart;
 }
 
+export function hasCompleteWeeklyHours(hours) {
+  return Array.isArray(hours) && hours.length === 7 && hours.some((day) => day !== null)
+    && hours.every((day) => day === null || (
+      typeof day?.open === 'string' && typeof day?.close === 'string'
+      && TIME_PATTERN.test(day.open) && TIME_PATTERN.test(day.close)
+      && parseClock(day.close) > parseClock(day.open)
+    ));
+}
+
 export function getDailyScheduleWindow({ date, weeklyHours, timezone }) {
   const dateParts = parseDate(date);
   const weekday = dateParts.calendarDate.getUTCDay();
@@ -206,14 +215,19 @@ export function buildStaffAvailability({
   salonBlockedPeriods = [],
   staffMembers,
   serviceId,
+  serviceIds = serviceId ? [serviceId] : [],
   serviceDurationMinutes,
   slotIntervalMinutes = 15,
   occupiedBookings = [],
   requestedStaffId,
+  after = new Date(0),
 }) {
+  const requestedServices = [...new Set(serviceIds)];
+  if (requestedServices.length === 0) throw fail('INVALID_SERVICE_IDS', 'At least one service is required.');
   const candidates = staffMembers.filter((member) => (
     member.active !== false
-    && member.serviceIds?.includes(serviceId)
+    && hasCompleteWeeklyHours(member.weeklyHours)
+    && requestedServices.every((id) => member.serviceIds?.includes(id))
     && (!requestedStaffId || String(member._id ?? member.id) === String(requestedStaffId))
   ));
   const combinedSlots = new Map();
@@ -223,7 +237,7 @@ export function buildStaffAvailability({
 
   for (const member of candidates) {
     const memberId = String(member._id ?? member.id);
-    const memberHours = member.weeklyHours?.length ? member.weeklyHours : salonWeeklyHours;
+    const memberHours = member.weeklyHours;
     const memberWindow = getDailyScheduleWindow({ date, weeklyHours: memberHours, timezone });
     if (salonWindow.closed || memberWindow.closed) continue;
     const opensAtMinute = Math.max(salonWindow.openMinute, memberWindow.openMinute);
@@ -248,6 +262,7 @@ export function buildStaffAvailability({
     });
 
     for (const slot of slots.slots) {
+      if (new Date(slot.startAt) <= new Date(after)) continue;
       const key = `${slot.startAt}|${slot.endAt}`;
       const current = combinedSlots.get(key) || {
         startAt: slot.startAt,

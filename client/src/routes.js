@@ -2,9 +2,12 @@ export const siteRoutes = [
   { path: '/', type: 'home' },
   { path: '/our-story', type: 'story' },
   { path: '/services', type: 'services' },
-  { path: '/services/womens-hair', type: 'category', category: "Women's hair" },
-  { path: '/services/beauty', type: 'category', category: 'Beauty services' },
-  { path: '/services/mens', type: 'category', category: "Men's services" },
+  { path: '/services/women', type: 'category', category: 'women' },
+  { path: '/services/men', type: 'category', category: 'men' },
+  { path: '/services/beauty', type: 'category', category: 'beauty' },
+  // Preserve the earlier public URLs so bookmarks and search results keep working.
+  { path: '/services/womens-hair', type: 'category', category: 'women', alias: true },
+  { path: '/services/mens', type: 'category', category: 'men', alias: true },
   { path: '/visit-us', type: 'visit' },
   { path: '/book', type: 'book' },
 ];
@@ -20,5 +23,5 @@ export function resolveRoute(pathname) {
 }
 
 export function servicesForCategory(services, category) {
-  return services.filter((service) => service.category === category);
+  return services.filter((service) => service.groupId === category || service.category === category);
 }
