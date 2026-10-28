@@ -1,14 +1,15 @@
 # Changelog
 
-## 2026-10-29 — pushed to review branch; not deployed
+## 2026-10-29 — service menu update for Render
 
 - Organized the 200-service catalog into Women, Men, and Beauty services groups with subcategories, search/filter navigation, and category routes; preserved catalog IDs and prices. Beauty remains separate from Unisex until the owner confirms its audience.
+- Split each category page into services ready to add to cart and services that need studio confirmation; only the former show an Add to cart button. Home page picks now use cart-ready entries, and the copy explains that adding an item does not reserve an appointment.
 - Added `SERVICE_DATA_REVIEW.md` with all catalog entries, current amounts, menu selection/booking state, durations, source notes, and confirmation questions. Four discount-only items still lack a payable price; all 200 durations remain unset.
 - Added multi-service availability based on one automatically assigned employee who is eligible for every cart item. Appointment intervals include combined approved durations and respect staff/salon hours, breaks, leave, blocked periods, existing bookings, and active holds.
 - Uses unique per-employee 15-minute lock segments so different employees can serve overlapping appointments while the same employee cannot be double-booked.
 - Kept the fixed ₹100 advance server-created and linked to a booking hold; removed the standalone Razorpay Payment Button that was unrelated to the selected cart and time.
 - Added `RAZORPAY_SETUP_GUIDE.md`; updated project, API, deployment, maintenance, and manual QA documentation for the current duration/staff-aware flow.
-- Public booking remains disabled. Provider-backed checkout/refund/webhook and browser visual QA require isolated staging and account setup. The changes are on GitHub review branch `codex/salon-menu-booking-ec863ae`; they were not merged to `main` or deployed to Render.
+- Public booking remains disabled. Provider-backed checkout/refund/webhook and browser visual QA require isolated staging and account setup. This update is on remote `main` for Render to fetch; confirm the deployment result in the Render dashboard.
 
 ## Earlier changes (historical; later entries supersede older behavior descriptions)
 

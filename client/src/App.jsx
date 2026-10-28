@@ -24,8 +24,8 @@ const fallbackCategoryPages = [
   { id: 'beauty', path: '/services/beauty', name: 'Beauty services', imageCategory: 'Beauty services', description: 'Facials, waxing, threading, nails, and other beauty services listed in the supplied menu.' },
 ];
 const selectedServiceIds = [
-  'women-hair-wash-blowdry', 'women-haircut-wash', 'beauty-hydra-facial',
-  'beauty-mani-pedi', 'men-haircut-beard-wash', 'men-aroma-facial-dtan',
+  'women-keratin', 'women-balayage', 'beauty-basic-herbal-facial',
+  'beauty-threading-eyebrows', 'men-haircut-beard-wash', 'men-haircut-beard-spa',
 ];
 const guestNotes = [
   { name: 'Manasvi Raut', quote: 'I had an amazing experience at THE DREAM BEAUTY UNISEX STUDIO My stylist, HASIM was incredibly skilled and attentive. He took the...' },
@@ -163,21 +163,25 @@ function getServiceDetails(service) {
   return description;
 }
 
+function isCartSelectable(service) {
+  return service.menuSelectable === true && service.needsConfirmation !== true
+    && Number.isFinite(service.priceRupees) && service.priceRupees > 0;
+}
+
 function ServiceCard({ service, index, compact = false, cartIds, addToCart, removeFromCart }) {
   const inCart = cartIds.includes(service.id);
-  const canAddToCart = service.menuSelectable === true && service.needsConfirmation !== true
-    && Number.isFinite(service.priceRupees) && service.priceRupees > 0;
+  const canAddToCart = isCartSelectable(service);
   const price = service.priceDisplay || (Number.isFinite(service.priceRupees)
     ? `₹${new Intl.NumberFormat('en-IN').format(service.priceRupees)}` : 'Price to be confirmed');
   return <article className={`service-card${compact ? ' service-card-compact' : ''}`}>
     <div className="service-card-top"><span>{String(index + 1).padStart(2, '0')}</span><span className="service-sparkle" aria-hidden="true">✳</span></div>
     <h3>{service.name}</h3>
-    {service.needsConfirmation && <p className="service-confirmation">Some wording, inclusions, or offer details need confirmation.</p>}
+    {service.needsConfirmation && <p className="service-confirmation">Needs studio confirmation · not available in cart</p>}
     {getServiceDetails(service) && <p className="service-details">{getServiceDetails(service)}</p>}
     <div className="service-meta"><span>{Number.isInteger(service.durationMinutes) && service.durationMinutes > 0 ? `${service.durationMinutes} minute visit` : 'Duration to be confirmed'}</span><strong>{price}</strong></div>
     {canAddToCart
       ? <button className={`service-cart-button${inCart ? ' is-added' : ''}`} type="button" disabled={!inCart && cartIds.length >= 20} onClick={() => inCart ? removeFromCart(service.id) : addToCart(service.id)} aria-pressed={inCart}>{inCart ? 'Remove from cart' : cartIds.length >= 20 ? 'Cart limit reached' : 'Add to cart'} <span aria-hidden="true">{inCart ? '−' : '+'}</span></button>
-      : <p className="service-cart-unavailable">Available to add after price and menu details are confirmed</p>}
+      : <p className="service-cart-unavailable">{service.needsConfirmation ? 'Add to cart will appear after the studio confirms the details below.' : 'Not currently available to add to cart.'}</p>}
   </article>;
 }
 
@@ -217,7 +221,7 @@ function HomePage({ salon, services, categoryPages, apiState, cartIds, addToCart
     <section className="home-categories section-shell"><div className="section-heading"><div><p className="eyebrow">Explore the menu</p><h2>Find your<br /><em>service.</em></h2></div><p>Choose a category to view the full salon menu, prices, and details that still need confirmation.</p></div><CategoryCards services={services} categoryPages={categoryPages} /></section>
 
     <section className="services-section section-shell home-picks">
-      <div className="section-heading"><div><p className="eyebrow">A few from the menu</p><h2>Start with<br /><em>something lovely.</em></h2></div><p>A small selection across hair, beauty, and grooming. Visit the category pages for all menu items.</p></div>
+      <div className="section-heading"><div><p className="eyebrow">A few from the menu</p><h2>Start with<br /><em>something lovely.</em></h2></div><p>A small selection across hair, beauty, and grooming. Add a service to save it in your cart; online appointments are not open yet. Visit the category pages for the full menu.</p></div>
       {apiState === 'loading' && <p className="api-note" role="status">Preparing the service menu…</p>}
       {apiState === 'fallback' && <p className="api-note" role="status">The salon menu is temporarily unavailable. Please contact the studio.</p>}
       {apiState === 'ready' && <div className="services-grid">{selected.map((service, index) => <ServiceCard service={service} index={index} compact cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>}
@@ -326,6 +330,8 @@ function ServiceCategoryPage({ category, services, categoryPages, apiState, cart
   const subcategories = [...new Set(items.map((service) => service.subcategory).filter(Boolean))];
   const filtered = items.filter((service) => `${service.name} ${service.description} ${service.subcategory || ''}`.toLowerCase().includes(query.toLowerCase().trim())
     && (subcategory === 'All services' || service.subcategory === subcategory));
+  const cartReadyServices = filtered.filter(isCartSelectable);
+  const confirmationServices = filtered.filter((service) => !isCartSelectable(service));
   const title = groupInfo?.name || categoryInfo?.name || category;
   const imageCategory = groupInfo?.imageCategory || categoryInfo?.imageCategory || category;
   return <main id="main" className="inner-page">
@@ -339,9 +345,18 @@ function ServiceCategoryPage({ category, services, categoryPages, apiState, cart
       </nav>}
       {apiState === 'loading' && <p className="api-note" role="status">Preparing the service menu…</p>}
       {apiState === 'fallback' && <p className="api-note" role="alert">The service menu is temporarily unavailable. Please contact the studio.</p>}
-      {apiState === 'ready' && filtered.length > 0 && <div className="service-list-grid">{filtered.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>}
+      {apiState === 'ready' && filtered.length > 0 && <div className="service-menu-groups">
+        {cartReadyServices.length > 0 && <section className="service-menu-group" aria-labelledby={`${groupId}-cart-ready-title`}>
+          <div className="service-menu-group-heading"><div><p className="eyebrow">Current menu price and details</p><h3 id={`${groupId}-cart-ready-title`}>Ready to add to your cart</h3><p>Adding a service saves your selection; it does not reserve an appointment.</p></div><span>{cartReadyServices.length} service{cartReadyServices.length === 1 ? '' : 's'}</span></div>
+          <div className="service-list-grid">{cartReadyServices.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>
+        </section>}
+        {confirmationServices.length > 0 && <section className="service-menu-group service-menu-group-pending" aria-labelledby={`${groupId}-confirmation-title`}>
+          <div className="service-menu-group-heading"><div><p className="eyebrow">Studio confirmation needed</p><h3 id={`${groupId}-confirmation-title`}>Not available to add yet</h3><p>These menu entries need a price, name, offer, or package detail confirmed first. The card explains what is needed.</p></div><span>{confirmationServices.length} service{confirmationServices.length === 1 ? '' : 's'}</span></div>
+          <div className="service-list-grid">{confirmationServices.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>
+        </section>}
+      </div>}
       {apiState === 'ready' && filtered.length === 0 && <p className="api-note">{items.length ? 'No services match this search.' : 'No services are currently listed in this category.'}</p>}
-      <p className="placeholder-note">Prices are shown as supplied by the studio. Service durations are still being confirmed, so services cannot be booked or paid for online yet. Offer terms and package inclusions also remain under review.</p>
+      <p className="placeholder-note">Prices are shown as supplied by the studio. Adding a service only saves it in your cart; appointment booking and online payment remain unavailable until durations, staff schedules, and provider setup are approved. Some offer terms and package inclusions still need confirmation.</p>
       {groupId === 'beauty' && <p className="placeholder-note">The supplied menu names this section “Beauty services” without stating its customer audience. The studio can confirm whether these services are for women, men, or all customers.</p>}
       <RouteLink className="button button-dark" to="/book">Open your cart <Arrow /></RouteLink>
     </section>

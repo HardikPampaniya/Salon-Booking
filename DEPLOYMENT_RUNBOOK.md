@@ -2,7 +2,7 @@
 
 ## Current state
 
-The public Render site is <https://dream-beauty-unisex-studio-karanjade.onrender.com/> and the Git remote points to `HardikPampaniya/Salon-Booking`. The current service menu and duration-aware booking changes are local and have not been pushed. `render.yaml` keeps `BOOKING_ENABLED=false` and `STAFF_ROSTER_APPROVED=false`.
+The public Render site is <https://dream-beauty-unisex-studio-karanjade.onrender.com/> and the Git remote points to `HardikPampaniya/Salon-Booking`. The service menu and cart-eligibility update is on remote `main`; confirm the corresponding build and deployment in Render. `render.yaml` keeps `BOOKING_ENABLED=false` and `STAFF_ROSTER_APPROVED=false`.
 
 Render environment variables are private to the owner’s dashboard; this workspace cannot inspect them. No separate staging deployment/database is configured. Do not use the production database for test payments or deploy unverified payment changes straight to the public service. Create an isolated staging service and database first, or keep the public booking gate off until staging and browser checks are complete.
 

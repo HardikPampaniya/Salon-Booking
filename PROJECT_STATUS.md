@@ -43,4 +43,4 @@
 
 ## Git and deployment
 
-Commit `ec863ae` from local `main` was pushed to GitHub review branch `codex/salon-menu-booking-ec863ae`; it was not merged to remote `main` and no Render deployment was triggered or verified. The existing Render service is production-facing and no separate staging service/database is available, so keep the checked-in Render booking switch disabled until staging, browser review, provider tests, and owner sign-off are complete.
+The menu reorganization, booking-readiness changes, and service-card update are published to remote `main` for the connected Render service to fetch. Verify the build/deploy result in Render. `BOOKING_ENABLED` remains false in the checked-in Render blueprint, and this release does not enable booking or payment collection.
