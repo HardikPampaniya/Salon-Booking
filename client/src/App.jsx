@@ -385,12 +385,12 @@ function VisitPage({ salon }) {
   return <main id="main" className="inner-page"><section className="page-hero section-shell"><PageHeading eyebrow="Come by" title="Visit the" accent="studio." copy="The Dream Beauty Unisex Studio is in Karanjade, Navi Mumbai. Call or message the studio with questions before your visit." /></section><VisitSummary salon={salon} /><section className="policy-summary section-shell" id="policies"><p className="eyebrow">Booking and cancellation</p><h2>Plan your<br /><em>salon visit.</em></h2><p>Choose an arrival time during salon hours. The selected time is your arrival time; the service begins when a team member is available. Online cancellation closes one hour before your selected arrival time. The fixed ₹100 online advance is credited against the bill; if a service costs less than ₹100, the studio returns the difference in cash after service. An eligible cancellation requests a refund of the full captured advance to the original payment method.</p><RouteLink className="text-link" to="/book">Book a salon visit <Arrow /></RouteLink></section></main>;
 }
 
-function BookPage({ salon, services, cartIds, onRemoveFromCart, onBrowseServices }) {
+function BookPage({ salon, services, cartIds, onRemoveFromCart, onBrowseServices, onBookingConfirmed }) {
   return <main id="main" className="inner-page booking-page">
     <section className="page-hero section-shell"><PageHeading eyebrow="Appointments" title="Make time" accent="for yourself." copy="Build your service list, choose a visit date and arrival time, then review the single ₹100 advance before checkout." /></section>
     <section className="booking-gate section-shell">
       <h2>Your service cart<br /><em>and visit time.</em></h2>
-      <BookingWidget salon={salon} services={services} cartIds={cartIds} onRemoveFromCart={onRemoveFromCart} onBrowseServices={onBrowseServices} />
+      <BookingWidget salon={salon} services={services} cartIds={cartIds} onRemoveFromCart={onRemoveFromCart} onBrowseServices={onBrowseServices} onBookingConfirmed={onBookingConfirmed} />
     </section>
   </main>;
 }
@@ -425,6 +425,11 @@ export default function App() {
   }, []);
   const removeFromCart = useCallback((id) => {
     setCartIds((current) => current.filter((item) => item !== id));
+  }, []);
+  const removeBookedServicesFromCart = useCallback((serviceIds) => {
+    const bookedIds = new Set(Array.isArray(serviceIds) ? serviceIds : []);
+    if (!bookedIds.size) return;
+    setCartIds((current) => current.filter((id) => !bookedIds.has(id)));
   }, []);
 
   const navigate = useCallback((to) => {
@@ -470,7 +475,7 @@ export default function App() {
     case 'services': page = <ServicesPage services={services} categoryPages={categoryPages} />; break;
     case 'category': page = <ServiceCategoryPage category={route.category} services={services} categoryPages={categoryPages} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
     case 'visit': page = <VisitPage salon={salon} />; break;
-    case 'book': page = <BookPage salon={salon} services={services} cartIds={cartIds} onRemoveFromCart={removeFromCart} onBrowseServices={() => navigate('/services')} />; break;
+    case 'book': page = <BookPage salon={salon} services={services} cartIds={cartIds} onRemoveFromCart={removeFromCart} onBrowseServices={() => navigate('/services')} onBookingConfirmed={removeBookedServicesFromCart} />; break;
     default: page = <NotFoundPage salon={salon} />;
   }
 

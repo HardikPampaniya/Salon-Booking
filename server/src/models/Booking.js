@@ -10,8 +10,7 @@ const bookingSchema = new mongoose.Schema({
     serviceId: { type: String, required: true },
     serviceName: { type: String, required: true },
     pricePaise: { type: Number, required: true, min: 0 },
-    // Optional so older arrival-time booking snapshots can still be managed;
-    // the current hold workflow always writes an approved positive duration.
+    // Kept optional for legacy records; arrival bookings do not use duration.
     durationMinutes: { type: Number, min: 1 },
   }],
   servicePricePaise: { type: Number, required: true, min: 0 },
@@ -26,6 +25,7 @@ const bookingSchema = new mongoose.Schema({
   staffId: { type: mongoose.Schema.Types.ObjectId, ref: 'Staff' },
   staffName: { type: String },
   startAt: { type: Date },
+  arrivalWindowEndAt: { type: Date },
   endAt: { type: Date },
   status: {
     type: String,
@@ -38,6 +38,8 @@ const bookingSchema = new mongoose.Schema({
   customer: {
     name: { type: String, required: true, trim: true, maxlength: 100 },
     phone: { type: String, required: true, trim: true, maxlength: 20 },
+    gender: { type: String, enum: ['male', 'female'] },
+    age: { type: Number, min: 1, max: 120, validate: Number.isInteger },
     email: { type: String, trim: true, lowercase: true, maxlength: 254 },
     whatsappUpdatesOptIn: { type: Boolean, required: true, default: false },
     whatsappUpdatesOptInAt: { type: Date, default: null },

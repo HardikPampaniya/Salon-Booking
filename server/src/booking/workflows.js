@@ -6,18 +6,16 @@ import { Booking } from '../models/Booking.js';
 import { ArrivalReservation } from '../models/ArrivalReservation.js';
 import { Payment } from '../models/Payment.js';
 import { Refund } from '../models/Refund.js';
-import { Staff } from '../models/Staff.js';
 import { SlotReservation } from '../models/SlotReservation.js';
 import { WebhookEvent } from '../models/WebhookEvent.js';
-import { buildStaffAvailability, getDailyScheduleWindow, hasCompleteWeeklyHours } from './availability.js';
-import { buildReservationSegments } from './reservation-locks.js';
+import { getDailyScheduleWindow } from './availability.js';
 import { recordAuditEvent } from './audit.js';
 import { isCustomerCancellationAllowed, isVisitDateCancellationAllowed } from './cancellation-policy.js';
-import { notificationConfiguration } from './notification-mode.js';
 import { queueBookingEvent } from './notifications.js';
 import {
   createRazorpayOrder,
   createRazorpayRefund,
+  fetchRazorpayOrderPayments,
   fetchRazorpayPayment,
   verifyCheckoutSignature,
   verifyWebhookSignature,
@@ -36,8 +34,8 @@ const rawHoldBodySchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,20}$/),
-  email: z.union([z.string().trim().email().max(254), z.literal('')]).optional(),
-  whatsappUpdatesOptIn: z.boolean().default(false),
+  gender: z.enum(['male', 'female']),
+  age: z.number().int().min(1).max(120),
   managementToken: z.string().min(32).max(200),
   policyAccepted: z.literal(true),
 });
@@ -89,19 +87,19 @@ function bookingReady() {
   return process.env.BOOKING_ENABLED === 'true'
     && mongoose.connection.readyState === 1
     && process.env.MONGODB_TRANSACTIONS_SUPPORTED === 'true'
-    && process.env.STAFF_ROSTER_APPROVED === 'true'
     && salon.bookingSchedule.ownerApproved === true
-    && razorpayModeMatches()
-    && Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET)
-    && notificationConfiguration().configured
     && POLICY_VERSION !== 'draft-v1'
     && PRIVACY_POLICY_VERSION !== 'draft-v1'
+    && razorpayModeMatches()
+    && Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET)
     && bookingHorizonIsValid();
 }
 
 function paymentReady() {
   return mongoose.connection.readyState === 1
-    && Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_WEBHOOK_SECRET);
+    && process.env.MONGODB_TRANSACTIONS_SUPPORTED === 'true'
+    && razorpayModeMatches()
+    && Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
 }
 
 function razorpayModeMatches() {
@@ -116,28 +114,17 @@ export async function bookingReadiness() {
   if (process.env.BOOKING_ENABLED !== 'true') issues.push('booking_disabled');
   if (mongoose.connection.readyState !== 1) issues.push('database_unavailable');
   if (mongoose.connection.readyState === 1 && process.env.MONGODB_TRANSACTIONS_SUPPORTED !== 'true') issues.push('mongodb_replica_set_required');
-  if (process.env.STAFF_ROSTER_APPROVED !== 'true') issues.push('staff_roster_not_approved');
   if (salon.bookingSchedule.ownerApproved !== true) issues.push('salon_schedule_not_approved');
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || !process.env.RAZORPAY_WEBHOOK_SECRET) issues.push('razorpay_not_configured');
-  else if (!razorpayModeMatches()) issues.push('razorpay_mode_mismatch');
-  const notificationStatus = notificationConfiguration();
-  if (notificationStatus.issue) issues.push(notificationStatus.issue);
   if (POLICY_VERSION === 'draft-v1') issues.push('booking_policy_not_approved');
   if (PRIVACY_POLICY_VERSION === 'draft-v1') issues.push('privacy_policy_not_approved');
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || !process.env.RAZORPAY_WEBHOOK_SECRET) issues.push('razorpay_not_configured');
+  else if (!razorpayModeMatches()) issues.push('razorpay_mode_mismatch');
   if (!bookingHorizonIsValid()) issues.push('booking_horizon_invalid');
-  const bookableServices = services.filter((service) => service.bookable === true && service.active === true);
-  if (salon.bookingSchedule.isPlaceholder || bookableServices.length === 0) issues.push('salon_configuration_incomplete');
-  if (mongoose.connection.readyState === 1 && bookableServices.length > 0) {
-    const activeStaff = await Staff.find({ active: true }).select('_id serviceIds weeklyHours').lean();
-    const completeStaff = activeStaff.filter((member) => hasCompleteWeeklyHours(member.weeklyHours));
-    const coveredServiceIds = new Set(completeStaff.flatMap((member) => member.serviceIds || []));
-    if (!completeStaff.length) issues.push('staff_schedules_missing');
-    else if (bookableServices.some((service) => !coveredServiceIds.has(service.id))) issues.push('staff_service_coverage_missing');
-  }
+  const eligibleServices = services.filter((service) => service.menuSelectable === true && service.active === true);
+  if (salon.bookingSchedule.isPlaceholder || eligibleServices.length === 0) issues.push('salon_configuration_incomplete');
   return {
     enabled: bookingReady() && issues.length === 0,
     issues,
-    whatsappNotificationsEnabled: notificationStatus.mode === 'whatsapp' && notificationStatus.configured,
   };
 }
 
@@ -178,9 +165,16 @@ function buildResponsePayload(booking, payment, managementToken) {
       visitDate: booking.visitDate,
       visitHours: booking.visitHours,
       startAt: booking.startAt,
+      arrivalWindowEndAt: booking.arrivalWindowEndAt,
       endAt: booking.endAt,
       salonTimezone: booking.salonTimezone,
       holdExpiresAt: booking.holdExpiresAt,
+      customer: {
+        name: booking.customer.name,
+        phone: booking.customer.phone,
+        gender: booking.customer.gender,
+        age: booking.customer.age,
+      },
     },
     payment: payment?.providerOrderId ? {
       provider: 'razorpay',
@@ -197,7 +191,7 @@ function buildResponsePayload(booking, payment, managementToken) {
 async function saveHold({ data, idempotencyKey }) {
   const selectedServices = data.serviceIds.map((id) => services.find((service) => service.id === id));
   if (selectedServices.some((service) => !service)) throw fail(404, 'SERVICE_NOT_FOUND', 'One or more selected services are no longer available.');
-  if (selectedServices.some((service) => service.active !== true || service.bookable !== true || service.needsConfirmation === true
+  if (selectedServices.some((service) => service.active !== true || service.menuSelectable !== true || service.needsConfirmation === true
     || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0) || salon.bookingSchedule.isPlaceholder) {
     throw fail(503, 'SALON_CONFIGURATION_INCOMPLETE', 'One or more selected services are not yet approved for online booking.');
   }
@@ -206,10 +200,8 @@ async function saveHold({ data, idempotencyKey }) {
     serviceId: service.id,
     serviceName: service.name,
     pricePaise: Math.round(service.priceRupees * 100),
-    durationMinutes: service.durationMinutes,
   }));
   const servicePricePaise = serviceSnapshots.reduce((total, service) => total + service.pricePaise, 0);
-  const serviceDurationMinutes = serviceSnapshots.reduce((total, service) => total + service.durationMinutes, 0);
   const primaryService = selectedServices[0];
   const serviceName = selectedServices.map((service) => service.name).join(' + ');
 
@@ -222,11 +214,11 @@ async function saveHold({ data, idempotencyKey }) {
   if (dailyWindow.closed) throw fail(400, 'SALON_CLOSED', 'The studio is closed on that date. Please choose another visit date.');
   const startAtDate = new Date(data.startAt);
   if (!Number.isFinite(startAtDate.getTime()) || salonDateString(startAtDate) !== data.date) {
-    throw fail(400, 'INVALID_ARRIVAL_TIME', 'Choose an appointment time on the selected visit date.');
+    throw fail(400, 'INVALID_ARRIVAL_TIME', 'Choose an arrival time on the selected visit date.');
   }
-  if (startAtDate <= now) throw fail(400, 'ARRIVAL_TIME_IN_PAST', 'Choose a future appointment time.');
+  if (startAtDate <= now) throw fail(400, 'ARRIVAL_TIME_IN_PAST', 'Choose a future arrival time.');
   if (startAtDate < dailyWindow.openingAt || startAtDate >= dailyWindow.closingAt) {
-    throw fail(400, 'OUTSIDE_OPENING_HOURS', 'Choose an appointment time during salon opening hours.');
+    throw fail(400, 'OUTSIDE_OPENING_HOURS', 'Choose an arrival time during salon opening hours.');
   }
   const localTime = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
     timeZone: salon.timezone,
@@ -236,8 +228,12 @@ async function saveHold({ data, idempotencyKey }) {
   }).formatToParts(startAtDate).map(({ type, value }) => [type, value]));
   const minuteOfDay = Number(localTime.hour) * 60 + Number(localTime.minute);
   const interval = salon.bookingSchedule.slotIntervalMinutes;
-  if (!Number.isInteger(interval) || interval < 5 || (minuteOfDay - dailyWindow.openMinute) % interval !== 0) {
-    throw fail(400, 'INVALID_ARRIVAL_TIME', 'Choose one of the available appointment times.');
+  if (!Number.isInteger(interval) || interval < 5 || interval > 60 || (minuteOfDay - dailyWindow.openMinute) % interval !== 0) {
+    throw fail(400, 'INVALID_ARRIVAL_TIME', 'Choose one of the available arrival times.');
+  }
+  const arrivalWindowEndAt = new Date(startAtDate.getTime() + interval * 60_000);
+  if (arrivalWindowEndAt > dailyWindow.closingAt) {
+    throw fail(400, 'OUTSIDE_OPENING_HOURS', 'Choose a full one-hour arrival window during salon opening hours.');
   }
   const today = salonDateString(now);
   if (data.date < today) throw fail(400, 'VISIT_DATE_IN_PAST', 'Choose today or a future visit date.');
@@ -251,8 +247,6 @@ async function saveHold({ data, idempotencyKey }) {
   if (data.date === today && !todayWindow.closed && now >= todayWindow.closingAt) {
     throw fail(400, 'SALON_CLOSED_TODAY', 'The studio is closed for today. Please choose tomorrow or a later visit date.');
   }
-  const endAtDate = new Date(startAtDate.getTime() + serviceDurationMinutes * 60_000);
-  if (endAtDate > dailyWindow.closingAt) throw fail(409, 'OUTSIDE_OPENING_HOURS', 'The selected service duration does not fit before closing time. Choose an earlier appointment time.');
   const managementExpiresAt = new Date(now.getTime() + 180 * 86_400_000);
   const holdExpiresAt = new Date(now.getTime() + HOLD_MINUTES * 60_000);
   const reference = makeReference();
@@ -272,57 +266,39 @@ async function saveHold({ data, idempotencyKey }) {
             && existing.startAt?.getTime() === startAtDate.getTime()
             && existing.customer.name === data.name
             && existing.customer.phone === data.phone
-            && (existing.customer.email || '') === (data.email || '')
-            && Boolean(existing.customer.whatsappUpdatesOptIn) === data.whatsappUpdatesOptIn;
+            && existing.customer.gender === data.gender
+            && existing.customer.age === data.age;
           if (!sameRequest) throw fail(409, 'IDEMPOTENCY_KEY_REUSED', 'Booking details changed. Start a new booking request.');
           const existingPayment = await Payment.findOne({ bookingId: existing._id }).session(session);
           created = { booking: existing, payment: existingPayment, isNew: false };
           return;
         }
 
-        const intervalMinutes = salon.bookingSchedule.slotIntervalMinutes;
-        const lockSegments = buildReservationSegments(startAtDate, endAtDate, intervalMinutes);
-        const candidateStaff = await Staff.find({
-          active: true,
-          serviceIds: { $all: data.serviceIds },
-        }).sort({ staffCode: 1 }).session(session).lean();
-        if (!candidateStaff.length) throw fail(503, 'STAFF_UNAVAILABLE', 'No active team member is configured for all selected services.');
-        const staffIds = candidateStaff.map((member) => member._id);
-        await SlotReservation.deleteMany({
-          staffId: { $in: staffIds },
-          slotAt: { $in: lockSegments },
+        await ArrivalReservation.deleteMany({
+          visitDate: data.date,
+          slotAt: startAtDate,
           status: 'held',
           expiresAt: { $lte: now },
         }).session(session);
-        const occupiedRows = await SlotReservation.find({
-          staffId: { $in: staffIds },
-          slotAt: { $gte: lockSegments[0], $lte: lockSegments.at(-1) },
+        const activeArrival = await ArrivalReservation.findOne({
+          visitDate: data.date,
+          slotAt: startAtDate,
           $or: [
             { status: 'confirmed' },
             { status: 'held', expiresAt: { $gt: now } },
           ],
-        }).select('staffId slotAt').session(session).lean();
-        const occupiedBookings = occupiedRows.map(({ staffId, slotAt }) => ({
-          staffId,
-          startAt: slotAt,
-          endAt: new Date(new Date(slotAt).getTime() + intervalMinutes * 60_000),
-        }));
-        const assignment = buildStaffAvailability({
-          date: data.date,
-          timezone: salon.timezone,
-          salonWeeklyHours: salon.bookingSchedule.weeklyHours,
-          salonBreaks: salon.bookingSchedule.breaks,
-          salonBlockedPeriods: salon.bookingSchedule.blockedPeriods,
-          staffMembers: candidateStaff,
-          serviceIds: data.serviceIds,
-          serviceDurationMinutes,
-          slotIntervalMinutes: intervalMinutes,
-          occupiedBookings,
-          after: now,
-        }).slots.find((slot) => slot.startAt === startAtDate.toISOString() && slot.endAt === endAtDate.toISOString());
-        if (!assignment?.staffOptions?.length) throw fail(409, 'ARRIVAL_TIME_UNAVAILABLE', 'That appointment time is no longer available. Please choose another time.');
-        const selectedStaff = candidateStaff.find((member) => String(member._id) === assignment.staffOptions[0].id);
-        if (!selectedStaff) throw fail(409, 'STAFF_UNAVAILABLE', 'A team member is no longer available for that time. Please choose another time.');
+        }).session(session).lean();
+        const legacyBooking = await Booking.findOne({
+          visitDate: data.date,
+          startAt: startAtDate,
+          $or: [
+            { status: { $in: ['confirmed', 'manual_resolution'] } },
+            { status: 'held', holdExpiresAt: { $gt: now } },
+          ],
+        }).session(session).lean();
+        if (activeArrival || legacyBooking) {
+          throw fail(409, 'ARRIVAL_TIME_UNAVAILABLE', 'That arrival time was just taken. Please choose another time.');
+        }
 
         const booking = await Booking.create([{
           reference,
@@ -331,7 +307,6 @@ async function saveHold({ data, idempotencyKey }) {
           serviceName,
           services: serviceSnapshots,
           servicePricePaise,
-          serviceDurationMinutes,
           advancePaise,
           visitDate: data.date,
           visitHours: {
@@ -339,19 +314,15 @@ async function saveHold({ data, idempotencyKey }) {
             close: salon.bookingSchedule.weeklyHours[dailyWindow.dateParts.calendarDate.getUTCDay()].close,
           },
           startAt: startAtDate,
-          endAt: endAtDate,
-          staffId: selectedStaff._id,
-          staffName: selectedStaff.displayName,
+          arrivalWindowEndAt,
           status: 'held',
           holdExpiresAt,
           salonTimezone: salon.timezone,
           customer: {
             name: data.name,
             phone: data.phone,
-            email: data.email || undefined,
-            whatsappUpdatesOptIn: data.whatsappUpdatesOptIn,
-            whatsappUpdatesOptInAt: data.whatsappUpdatesOptIn ? now : null,
-            whatsappConsentVersion: data.whatsappUpdatesOptIn ? (process.env.WHATSAPP_CONSENT_VERSION || 'wa-updates-v1') : null,
+            gender: data.gender,
+            age: data.age,
           },
           managementTokenHash: hashToken(data.managementToken),
           managementExpiresAt,
@@ -366,13 +337,13 @@ async function saveHold({ data, idempotencyKey }) {
           currency: 'INR',
           status: 'order_pending',
         }], { session });
-        await SlotReservation.create(lockSegments.map((slotAt) => ({
-          staffId: selectedStaff._id,
-          slotAt,
+        await ArrivalReservation.create([{
+          visitDate: data.date,
+          slotAt: startAtDate,
           bookingId: bookingDoc._id,
           status: 'held',
           expiresAt: holdExpiresAt,
-        })), { session });
+        }], { session });
         await recordAuditEvent({
           eventKey: `booking:${bookingDoc._id}:hold_created`, bookingId: bookingDoc._id,
           entityType: 'booking', entityId: bookingDoc._id, eventType: 'hold_created',
@@ -595,12 +566,42 @@ export async function verifyCheckoutPayment(rawBody) {
       visitDate: booking.visitDate,
       visitHours: booking.visitHours,
       startAt: booking.startAt,
+      arrivalWindowEndAt: booking.arrivalWindowEndAt,
       salonTimezone: booking.salonTimezone,
       cancellationAllowed: ['held', 'confirmed'].includes(booking.status) && cancellationAllowed(booking),
     },
     payment: { status: currentPayment.status, amountPaise: currentPayment.amountPaise },
     refund: refund ? { status: refund.status, amountPaise: refund.amountPaise } : null,
   };
+}
+
+export async function reconcileManagedPayment(request) {
+  if (!paymentReady()) throw fail(503, 'PAYMENT_VERIFICATION_UNAVAILABLE', 'Payment verification is temporarily unavailable.');
+  const booking = await findManagedBooking(request);
+  const payment = await Payment.findOne({ bookingId: booking._id }).lean();
+  if (!payment?.providerOrderId) throw fail(404, 'PAYMENT_NOT_FOUND', 'This booking has no payment order to check.');
+  if (['captured', 'refund_pending', 'refunded', 'refund_failed', 'manual_review'].includes(payment.status)) {
+    return getManagedBooking(request);
+  }
+
+  const result = await fetchRazorpayOrderPayments(payment.providerOrderId);
+  const orderPayments = (result.items || []).filter((item) => item.order_id === payment.providerOrderId);
+  const capturedPayment = orderPayments.find((item) => item.status === 'captured');
+  if (capturedPayment) await handleCapturedPayment(capturedPayment);
+  else {
+    const unresolvedPayment = orderPayments.find((item) => item.status === 'authorized')
+      || orderPayments.find((item) => item.status === 'failed');
+    const currentPayment = unresolvedPayment
+      ? { ...unresolvedPayment, status: unresolvedPayment.currency === payment.currency && unresolvedPayment.amount === payment.amountPaise ? unresolvedPayment.status : 'manual_review' }
+      : null;
+    if (currentPayment) {
+      await Payment.updateOne(
+        { _id: payment._id, status: { $nin: ['captured', 'refund_pending', 'refunded', 'refund_failed', 'manual_review'] } },
+        { $set: { providerPaymentId: currentPayment.id, status: currentPayment.status } },
+      );
+    }
+  }
+  return getManagedBooking(request);
 }
 
 export async function handleCapturedPayment(providerPayment) {
@@ -814,8 +815,15 @@ export async function getManagedBooking(request) {
       visitDate: booking.visitDate,
       visitHours: booking.visitHours,
       startAt: booking.startAt,
+      arrivalWindowEndAt: booking.arrivalWindowEndAt,
       endAt: booking.endAt,
       salonTimezone: booking.salonTimezone,
+      customer: {
+        name: booking.customer.name,
+        phone: booking.customer.phone,
+        gender: booking.customer.gender,
+        age: booking.customer.age,
+      },
       cancellationAllowed: ['held', 'confirmed'].includes(booking.status) && cancellationAllowed(booking),
     },
     payment: payment ? { status: payment.status, amountPaise: payment.amountPaise } : null,
@@ -836,7 +844,7 @@ export async function cancelManagedBooking(request) {
       if (current.status === 'cancelled') return;
       if (!['held', 'confirmed'].includes(current.status)) throw fail(409, 'BOOKING_CANNOT_BE_CANCELLED', 'This booking needs help from the salon.');
       if (!cancellationAllowed(current)) {
-        throw fail(409, 'CANCELLATION_WINDOW_CLOSED', 'Online cancellation closes one hour before your selected appointment time. Please contact the salon for help.');
+        throw fail(409, 'CANCELLATION_WINDOW_CLOSED', 'Online cancellation closes one hour before your selected arrival time. Please contact the salon for help.');
       }
       const priorBookingStatus = current.status;
       current.status = 'cancelled';

@@ -7,18 +7,19 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import mongoose from 'mongoose';
 import { z } from 'zod';
-import { buildStaffAvailability, getDailyScheduleWindow } from './booking/availability.js';
+import { buildArrivalTimes, getDailyScheduleWindow } from './booking/availability.js';
 import {
   bookingReadiness,
   cancelManagedBooking,
   createBookingHold,
   getManagedBooking,
+  reconcileManagedPayment,
   processRazorpayWebhook,
   verifyCheckoutPayment,
 } from './booking/workflows.js';
 import { salon, serviceMenuGroups, services } from './config/salon.js';
-import { Staff } from './models/Staff.js';
-import { SlotReservation } from './models/SlotReservation.js';
+import { ArrivalReservation } from './models/ArrivalReservation.js';
+import { Booking } from './models/Booking.js';
 
 const availabilityQuerySchema = z.object({
   serviceId: z.string().min(1).max(80).optional(),
@@ -47,6 +48,14 @@ function formatClock(minuteOfDay) {
   const period = hour24 >= 12 ? 'PM' : 'AM';
   const hour12 = hour24 % 12 || 12;
   return `${hour12}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+function formatLocalTime(date, timezone) {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function salonDateString(date, timezone) {
@@ -90,7 +99,15 @@ export function createApp() {
   ].filter(Boolean))];
   app.use(cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      let isLocalDevelopmentOrigin = false;
+      if (process.env.NODE_ENV === 'development' && origin) {
+        try {
+          const parsedOrigin = new URL(origin);
+          isLocalDevelopmentOrigin = ['http:', 'https:'].includes(parsedOrigin.protocol)
+            && ['localhost', '127.0.0.1'].includes(parsedOrigin.hostname);
+        } catch {}
+      }
+      if (!origin || allowedOrigins.includes(origin) || isLocalDevelopmentOrigin) return callback(null, true);
       return callback(new Error('Origin is not allowed by CORS.'));
     },
   }));
@@ -150,6 +167,11 @@ export function createApp() {
     catch (error) { next(error); }
   });
 
+  app.post('/api/bookings/reconcile-payment', bookingWriteLimit, async (request, response, next) => {
+    try { response.set('Cache-Control', 'no-store').json(await reconcileManagedPayment(request)); }
+    catch (error) { next(error); }
+  });
+
   app.post('/api/bookings/cancel', bookingWriteLimit, async (request, response, next) => {
     try { response.set('Cache-Control', 'no-store').json(await cancelManagedBooking(request)); }
     catch (error) { next(error); }
@@ -168,15 +190,15 @@ export function createApp() {
 
     try {
       const { date } = parsed.data;
-      const ids = selectedServices.map(({ id }) => id);
       const schedule = salon.bookingSchedule;
-      if (schedule.isPlaceholder || selectedServices.some((service) => service.active !== true || service.bookable !== true
-        || service.needsConfirmation === true || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0
-        || !Number.isInteger(service.durationMinutes) || service.durationMinutes < 1)) {
+      if (schedule.isPlaceholder || schedule.ownerApproved !== true || selectedServices.some((service) => service.active !== true || service.menuSelectable !== true
+        || service.needsConfirmation === true || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0)) {
         return response.status(503).json({ error: { code: 'BOOKING_SETUP_INCOMPLETE', message: 'One or more selected services are not yet approved for online booking.' } });
       }
-      const readiness = await bookingReadiness();
-      if (!readiness.enabled) return response.status(503).json({ error: { code: 'BOOKING_NOT_READY', message: 'Online booking is not ready; no reservable times are available yet.', issues: readiness.issues } });
+      const databaseAvailable = mongoose.connection.readyState === 1;
+      if (!databaseAvailable && process.env.BOOKING_ENABLED === 'true') {
+        return response.status(503).json({ error: { code: 'BOOKING_DATABASE_UNAVAILABLE', message: 'Arrival times cannot be checked right now.' } });
+      }
       const now = new Date();
       const today = salonDateString(now, salon.timezone);
       const maxDaysAhead = Number(process.env.MAX_BOOKING_DAYS_AHEAD || 60);
@@ -194,7 +216,7 @@ export function createApp() {
       });
       if (dailyWindow.closed) {
         return response.json({
-          services: selectedServices.map(({ id, name, priceRupees, durationMinutes }) => ({ id, name, priceRupees, durationMinutes })),
+          services: selectedServices.map(({ id, name, priceRupees }) => ({ id, name, priceRupees })),
           date,
           timezone: salon.timezone,
           closed: true,
@@ -203,45 +225,49 @@ export function createApp() {
           isPlaceholderSchedule: schedule.isPlaceholder,
         });
       }
-      const totalDurationMinutes = selectedServices.reduce((total, service) => total + service.durationMinutes, 0);
-      const staffMembers = await Staff.find({ active: true, serviceIds: { $all: ids } }).lean();
-      if (!staffMembers.length) return response.status(503).json({ error: { code: 'STAFF_UNAVAILABLE', message: 'No team member is configured for all selected services.' } });
-      const staffIds = staffMembers.map((member) => member._id);
-      const occupiedRows = await SlotReservation.find({
-        staffId: { $in: staffIds },
-        slotAt: { $gte: dailyWindow.openingAt, $lt: dailyWindow.closingAt },
-        $or: [
-          { status: 'confirmed' },
-          { status: 'held', expiresAt: { $gt: now } },
-        ],
-      }).select('staffId slotAt').lean();
-      const intervalMinutes = schedule.slotIntervalMinutes;
-      const occupiedBookings = occupiedRows.map(({ staffId, slotAt }) => ({
-        staffId,
-        startAt: slotAt,
-        endAt: new Date(new Date(slotAt).getTime() + intervalMinutes * 60_000),
-      }));
-      const availability = buildStaffAvailability({
+      const intervalMinutes = schedule.slotIntervalMinutes || 60;
+      const availability = buildArrivalTimes({
         date,
         timezone: salon.timezone,
-        salonWeeklyHours: schedule.weeklyHours,
-        salonBreaks: schedule.breaks,
-        salonBlockedPeriods: schedule.blockedPeriods,
-        staffMembers,
-        serviceIds: ids,
-        serviceDurationMinutes: totalDurationMinutes,
-        slotIntervalMinutes: intervalMinutes,
-        occupiedBookings,
+        weeklyHours: schedule.weeklyHours,
+        intervalMinutes,
         after: now,
       });
-      const availableSlots = availability.slots.map(({ staffOptions, ...slot }) => ({
-        ...slot,
-        availableStaffCount: staffOptions.length,
-      }));
+      const [arrivalRows, legacyBookings] = databaseAvailable ? await Promise.all([
+        ArrivalReservation.find({
+          visitDate: date,
+          slotAt: { $gte: dailyWindow.openingAt, $lt: dailyWindow.closingAt },
+          $or: [
+            { status: 'confirmed' },
+            { status: 'held', expiresAt: { $gt: now } },
+          ],
+        }).select('slotAt').lean(),
+        Booking.find({
+          visitDate: date,
+          startAt: { $gte: dailyWindow.openingAt, $lt: dailyWindow.closingAt },
+          $or: [
+            { status: { $in: ['confirmed', 'manual_resolution'] } },
+            { status: 'held', holdExpiresAt: { $gt: now } },
+          ],
+        }).select('startAt').lean(),
+      ]) : [[], []];
+      const occupied = new Set([
+        ...arrivalRows.map(({ slotAt }) => new Date(slotAt).toISOString()),
+        ...legacyBookings.map(({ startAt }) => new Date(startAt).toISOString()),
+      ]);
+      const availableSlots = availability.slots
+        .filter((slot) => !occupied.has(slot.startAt))
+        .map((slot) => {
+          const arrivalWindowEndAt = new Date(new Date(slot.startAt).getTime() + intervalMinutes * 60_000);
+          return {
+            ...slot,
+            arrivalWindowEndAt: arrivalWindowEndAt.toISOString(),
+            time: `${formatLocalTime(new Date(slot.startAt), salon.timezone)} to ${formatLocalTime(arrivalWindowEndAt, salon.timezone)}`,
+          };
+        });
 
       return response.json({
-        services: selectedServices.map(({ id, name, priceRupees, durationMinutes }) => ({ id, name, priceRupees, durationMinutes })),
-        durationMinutes: totalDurationMinutes,
+        services: selectedServices.map(({ id, name, priceRupees }) => ({ id, name, priceRupees })),
         date,
         timezone: salon.timezone,
         closed: false,
@@ -249,6 +275,7 @@ export function createApp() {
           open: formatClock(dailyWindow.openMinute),
           close: formatClock(dailyWindow.closeMinute),
         },
+        intervalMinutes,
         slots: availableSlots,
         isPlaceholderSchedule: schedule.isPlaceholder,
       });
@@ -279,7 +306,15 @@ export function createApp() {
     const message = error.code === 11000
       ? 'That booking request could not be completed. Please choose another time.'
       : status >= 500 ? 'An unexpected server error occurred.' : error.message;
-    if (status >= 500) console.error('request_error', { status, name: error.name });
+    if (status >= 500) {
+      const diagnostic = { status, name: error.name };
+      if (process.env.NODE_ENV !== 'production') {
+        if (typeof error.code === 'string' || typeof error.code === 'number') diagnostic.code = error.code;
+        if (typeof error.cause?.code === 'string' || typeof error.cause?.code === 'number') diagnostic.causeCode = error.cause.code;
+        diagnostic.stack = error.stack?.split('\n').slice(1, 6).map((line) => line.trim());
+      }
+      console.error('request_error', diagnostic);
+    }
     response.status(status).json({ error: { code: error.code || 'REQUEST_ERROR', message } });
   });
 

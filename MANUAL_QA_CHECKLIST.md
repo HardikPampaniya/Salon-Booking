@@ -1,47 +1,31 @@
-# Manual browser and staging QA checklist
+﻿# Manual browser and staging QA checklist
 
-Use a private browser profile for staging and never enter real customer card/UPI credentials in a test. Screenshot-based browser checks have not been completed in this environment.
+Use a private browser profile for staging. Never use real customer payment credentials in a Razorpay test.
 
-## Marketing and service-menu pages
+## Website and checkout UI
 
-- Directly open and refresh `/`, `/our-story`, `/services`, `/services/women`, `/services/men`, `/services/beauty`, `/visit-us`, and `/book`. Check the legacy `/services/womens-hair` and `/services/mens` aliases and an unknown route. Verify browser Back/Forward and the mobile menu.
-- On `/services`, check the Women, Men, and Beauty services cards and subcategory links. Beauty must not be described as Unisex until the salon confirms it serves all genders.
-- Search/filter on each category page. Check prices, discount notices, confirmation flags, empty search, category counts, and long names/packages. Confirm home still shows a selected menu subset, not all 200 entries.
-- Review all owner-provided category and gallery images at 360×800, 390×844, 768×1024, 1366×768, and 1920×1080. Check the prior hero image, category relevance, gallery alignment, alt text, crop, and load errors. No menu scans should appear as customer photos.
-- Check address, call/WhatsApp number, directions link, seven-day hours, all 11 supplied review items, carousel dots, automatic 4-second rotation, reduced motion, and keyboard focus.
-- Test text zoom at 200%, visible keyboard focus, touch target size, contrast, heading order, screen-reader names/status messages, and no horizontal scrolling.
+- Directly open and refresh `/`, `/our-story`, `/services`, each service category, `/visit-us`, and `/book`. Check legacy service route aliases, unknown routes, browser Back/Forward, and the mobile menu.
+- Check service search, prices, offer/confirmation labels, the cart, remove controls, and blocked services with unresolved names/prices.
+- Review the supplied images and layout at 360x800, 390x844, 768x1024, 1366x768, and 1920x1080. Check keyboard focus, zoom, contrast, screen-reader names/statuses, and horizontal scrolling.
+- Confirm the cart date picker uses salon local dates, offers one-hour arrival windows only during opening hours, and clearly explains that the window is not a guaranteed service start time.
+- Confirm the customer form contains only full name, phone, gender, and age. Check required-field validation and that no email or WhatsApp opt-in is requested.
+- When booking is disabled, the Pay INR 100 button stays disabled and the page says that selected details/time are not submitted or reserved.
 
-## Booking gate when disabled
+## Private staging booking and payment
 
-- Confirm `/book` shows the “not available” state and direct contact, and does not collect customer details, create holds, or open Checkout.
-- Confirm `GET /api/booking/readiness` shows why booking is disabled without revealing secrets. The public deployment must continue using `BOOKING_ENABLED=false` until all readiness checks and owner sign-off pass.
+Do not use the production database or Live keys. Use a transaction-capable isolated staging database, Razorpay Test Mode keys, approved policy versions, and `BOOKING_ENABLED=true` only on private staging.
 
-## Private staging setup
-
-Do not use the production database or live keys. Use a transaction-capable isolated staging database, Razorpay Test Mode credentials, approved temporary service durations, approved staff schedules/eligibility, a real staging notification destination, and approved policy versions.
-
-- Verify a single selected service returns starts only when one qualified employee can complete it inside salon/staff hours.
-- Verify a multi-service cart is shown only when one employee can perform every item and has enough continuous time. No customer-facing employee selector should exist; the server assigns staff.
-- Confirm breaks, employee leave, special closures, blocked periods, previous bookings, and unexpired holds remove the affected interval. Confirm an appointment can finish at closing but not overrun it.
-- With two eligible employees, verify overlapping appointments can be assigned to different employees. Verify one employee cannot have overlapping intervals, even when a later request starts between 15-minute boundaries. Send concurrent requests for the same employee/time and confirm one lock wins.
-- Verify the temporary hold expires after ten minutes and every one of its lock segments is released. Confirm retrying the same idempotency key does not create duplicate bookings or orders.
-- Check that the service subtotal is server-calculated, exactly one ₹100 advance is charged for the cart, the balance is shown for payment at the salon, and a sub-₹100 service displays the approved cash-change wording.
-
-## Razorpay Test Mode and notifications
-
-Follow `RAZORPAY_SETUP_GUIDE.md`. Keep Live keys out of staging and keep production booking disabled.
-
-- Complete a test checkout and verify the server created an INR order for 10,000 paise, verified signature, fetched provider status, matched payment/order/amount/currency, and only then confirmed the booking.
-- Cancel/close Checkout and simulate provider payment failure; verify the booking remains unconfirmed or the hold expires as appropriate.
-- Test successful capture and browser callback/webhook arrival in both orders. Redeliver a webhook event if the dashboard supports it; verify duplicate event delivery does not duplicate confirmation/refund/notification.
-- Test a payment captured after hold expiration or a booking conflict and verify it enters the documented refund/manual-resolution path.
-- Cancel more than one hour before the start, exactly at one hour, and within the final hour. Confirm eligibility at the boundary, release of staff locks, and a pending refund until Razorpay reports its final state.
-- Exercise refund processed, failed, and uncertain/manual-review outcomes. Do not treat provider acceptance as completed refund and do not blindly resubmit an uncertain refund.
-- Verify owner and customer notification outbox records and actual provider delivery. For WhatsApp, verify approved templates, owner destination, explicit customer opt-in, and delivery status. Mock mode does not deliver.
+- Confirm only services with approved wording and a final payable price can be checked out. No duration or staff schedule should be required.
+- Confirm selecting a date/time outside salon hours or in the past is rejected by both UI and API.
+- Confirm a 10-minute hold reserves a single one-hour arrival window; a second concurrent request for the same window cannot create another active booking. A separate available window can be reserved.
+- Confirm retrying the same idempotency key does not create duplicate bookings or payment orders.
+- Complete a test checkout and confirm the server order is exactly INR 100, verifies Checkout signature and provider status, and marks the booking confirmed only after trusted capture verification.
+- Cancel/close Checkout and simulate payment failure; confirm the booking is not falsely confirmed. Confirm the hold expires and releases its slot after ten minutes.
+- Test webhook delivery before/after browser callback, duplicate webhooks, late payment, cancellation at the one-hour boundary, refund pending/final states, and management-token access.
+- Verify that the website shows a booking confirmation after payment verification. WhatsApp is pending: do not expect a WhatsApp message or mark it as delivered.
 
 ## Release gate
 
-- Check direct routes and refresh on the actual HTTPS host, including custom-domain certificate validity and CORS.
-- Run the automated suite and production build for the exact commit to deploy.
-- Verify backups and restore procedure; review environment variables without exposing secrets.
-- Keep `BOOKING_ENABLED=false` until the salon owner signs off on menu, staff/time schedules, cancellation/refund policy, privacy and notifications, staging tests, and browser/accessibility QA.
+- Check direct routes and refresh on the HTTPS host, including CORS and custom-domain certificate.
+- Review environment variable names without exposing secret values.
+- Keep `BOOKING_ENABLED=false` until private staging payment checks, browser/accessibility review, policy approval, and salon-owner sign-off are complete.

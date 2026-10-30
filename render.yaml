@@ -13,8 +13,6 @@ services:
         value: "24.18.0"
       - key: BOOKING_ENABLED
         value: "false"
-      - key: STAFF_ROSTER_APPROVED
-        value: "false"
       - key: SALON_TIMEZONE
         value: Asia/Kolkata
       - key: TRUST_PROXY_HOPS

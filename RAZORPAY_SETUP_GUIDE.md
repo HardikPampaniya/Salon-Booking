@@ -1,75 +1,79 @@
-# Razorpay test setup guide
+# Razorpay setup for hourly-arrival checkout
 
-This project creates a Razorpay **order for a specific booking hold** and charges a fixed ₹100 advance (10,000 paise). It does not use a reusable Payment Link or standalone Payment Button. A payment counts only after the server verifies it. Keep the site’s booking switch off until an isolated test environment is ready.
+The cart checkout creates a Razorpay order on the server for the selected services and one fixed **₹100 advance**. Razorpay Checkout pays that order, and the server confirms the booking only after verifying the payment. A Razorpay.me link, payment button, or QR code is a separate collection flow and will not automatically reserve the cart's date and arrival window.
 
-## Before starting
+The selected time is a one-hour **planned arrival window** (for example, 10:00–11:00 AM). It does not promise that a service starts at the beginning of that hour. Staff schedules, employee selection, and service durations are not booking requirements. WhatsApp delivery is still pending and is not a payment-readiness requirement.
 
-- The local root `.env` currently has no MongoDB URI or Razorpay credentials. Do not paste any secret into chat or Git.
-- You need an isolated **test** database that supports MongoDB transactions, an approved service with price and duration, a staff member eligible for that service with a complete schedule, approved booking/privacy policies, and a non-mock notification provider. These gates are why checkout is currently disabled.
-- Do not attach test payments to the production database. Use a separate staging deployment and database, or a private local setup. Never turn on live payments as part of this guide.
+## Why the Pay button may be disabled
 
-## A. Create test API keys
+The button is enabled only when booking readiness is satisfied. This workspace's local `.env` has no MongoDB URI or Razorpay credentials, and public Render checkout remains disabled. A set of masked Render environment values does not verify that they are correct or that the database supports transactions.
 
-1. Sign in to the salon owner’s [Razorpay Dashboard](https://dashboard.razorpay.com/).
-2. Switch the dashboard to **Test Mode**. Test and Live credentials are different; test mode simulates payments and does not transfer real money.
-3. Open **Settings → API Keys** (the exact dashboard wording may vary) and generate a Test Key. Save the Key ID and Key Secret securely when they are shown. Razorpay’s [API key instructions](https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/) explain the separate modes.
-4. In the repository root, open the ignored `.env` file. Set these values using your own test credentials:
+Do not paste API secrets, database credentials, or webhook secrets into chat, source files, `.env.example`, or any `VITE_*` variable.
+
+## 1. Use Razorpay Test Mode first
+
+1. Sign in to the salon's [Razorpay Dashboard](https://dashboard.razorpay.com/).
+2. Switch to **Test Mode** using the dashboard's mode switch. Test and Live credentials are separate.
+3. Open **Account & Settings → API Keys** (the exact label may vary) and generate a Test Key ID and Key Secret. Copy them into the ignored root `.env` file on your computer. Do not use `rzp_live_...` keys for this test.
 
    ```dotenv
    RAZORPAY_MODE=test
-   RAZORPAY_KEY_ID=rzp_test_your_test_key_id
+   RAZORPAY_KEY_ID=rzp_test_...
    RAZORPAY_KEY_SECRET=your_test_key_secret
    ```
 
-   The Key Secret stays on the server. Do not add it to `client/`, `VITE_*` variables, source files, or messages. The public checkout only receives the Key ID and a server-created order ID.
+Razorpay's [API key instructions](https://razorpay.com/docs/payments/dashboard/account-settings/api-keys/) explain where keys are generated. The Key Secret belongs only on the server. The app sends the Key ID and server-created order ID to the browser.
 
-## B. Create a test webhook
+## 2. Provide an isolated transaction-capable database
 
-1. Your webhook receiver must be reachable at a public HTTPS URL. Razorpay cannot deliver a webhook to `localhost` directly. Use the isolated staging app’s HTTPS URL, or use a short-lived HTTPS tunnel for a local test. Do not point a test webhook at a production database.
-2. In Test Mode, open **Accounts & Settings → Webhooks** in the Razorpay Dashboard and add a webhook with this URL:
+Booking holds use MongoDB transactions to prevent two customers taking the same one-hour arrival window. Use a **separate test database** on MongoDB Atlas or another replica-set/sharded deployment. Do not use the salon's production booking data for payment tests.
+
+Add its URI to the root `.env` as `MONGODB_URI=...`, then restart the server. The app detects transaction support when it connects. Do not set `MONGODB_TRANSACTIONS_SUPPORTED` yourself. The current local setup has no URI, so this step is still needed before checkout can be enabled locally.
+
+## 3. Configure and test the webhook
+
+The app verifies Razorpay's signed webhook events and deduplicates retries. Razorpay needs a public HTTPS callback; it cannot deliver a webhook directly to `localhost`.
+
+1. In Test Mode, open **Account & Settings → Webhooks** in the Dashboard.
+2. For an isolated staging deployment, use:
 
    ```text
-   https://YOUR-ISOLATED-STAGING-HOST/api/webhooks/razorpay
+   https://YOUR-STAGING-HOST/api/webhooks/razorpay
    ```
 
-3. Create a strong webhook secret. This is a separate value from the API Key Secret. Put the same value into the staging backend’s `RAZORPAY_WEBHOOK_SECRET` environment variable, save it in Render’s secret environment settings (or your private local `.env`), and restart/redeploy the isolated staging service. Never show or send this value in chat.
-4. Subscribe to the events handled by this project: `payment.authorized`, `payment.captured`, `payment.failed`, `refund.processed`, and `refund.failed`. The endpoint verifies Razorpay’s signature against the exact raw request body and deduplicates event IDs.
-5. Save the webhook. Use Razorpay’s [webhook setup guide](https://razorpay.com/docs/webhooks/setup-edit-payments/) and [signature validation guide](https://razorpay.com/docs/webhooks/validate-test/) if the dashboard labels differ.
+   Do not point a test webhook at a production database. A local webhook test needs a temporary HTTPS tunnel and should still use only the isolated test database.
+3. Create a strong webhook secret in Razorpay and set the exact same value as `RAZORPAY_WEBHOOK_SECRET` in that backend's private environment. This is separate from the API Key Secret.
+4. Subscribe to `payment.authorized`, `payment.captured`, `payment.failed`, `refund.processed`, and `refund.failed`, then save.
 
-The webhook secret must match the secret used when that webhook is registered. If the webhook is edited later, update the backend secret to the corresponding value. Configure Test and Live webhooks separately.
+See Razorpay's [webhook setup guide](https://razorpay.com/docs/webhooks/setup-edit-payments/) and [webhook signature guide](https://razorpay.com/docs/webhooks/validate-test/). Configure Test and Live webhooks separately.
 
-## C. Start and test the isolated app
+## 4. Enable checkout only in private testing
 
-1. Configure the isolated backend environment. Besides the three Razorpay variables above, booking needs `BOOKING_ENABLED=true` **only in that private test environment**, a transaction-capable `MONGODB_URI`, approved service durations/prices, approved staff data, `STAFF_ROSTER_APPROVED=true`, a real notification provider, and approved policy version values. The server checks MongoDB’s replica-set/sharded status at startup; do not set that check manually. Keep `render.yaml` and the public Render service disabled.
-2. For a local run, start the app from the project root:
+For a private local or staging test, configure all of the following in that test backend:
 
-   ```powershell
-   npm install
-   npm run dev
-   ```
+- `BOOKING_ENABLED=true`
+- `MONGODB_URI` pointing to the isolated transaction-capable test database
+- `RAZORPAY_MODE=test`
+- Test `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`
+- The matching Test `RAZORPAY_WEBHOOK_SECRET`
+- Approved, non-draft `BOOKING_POLICY_VERSION` and `PRIVACY_POLICY_VERSION` values after the salon approves the displayed terms
 
-   Open <http://localhost:5173>. Without all readiness requirements, `/book` will explain that booking is unavailable. Do not turn off readiness checks just to reveal the payment button.
-3. Select a service, date, and available appointment start time. Check that the summary shows the service total, one ₹100 advance, the balance due at the salon (or cash change for a service below ₹100), assigned staff, and cancellation terms.
-4. Use Razorpay’s current [test payment instructions](https://razorpay.com/docs/payments/payments/test-upi-details/) in the checkout mock. For UPI, the documented success/failure examples are `success@razorpay` and `failure@razorpay`. Follow Razorpay’s test-card documentation for cards. Test credentials and test payers never charge a customer.
-5. After a successful test, confirm all of these: Checkout was created with a server order for exactly INR 100; the backend verified the callback signature and fetched/checked provider payment status, amount, currency and order; only then did the booking become confirmed; a signed webhook can safely arrive before or after the browser callback; and customer/owner notification events reach the configured provider.
-6. Try a failed or cancelled Checkout and verify that the booking is not confirmed. Let a hold expire and verify it releases its staff/time locks. Use two test browsers to try overlapping times; different eligible employees may serve overlapping visits, but the same employee cannot be double-booked.
-7. Cancel a confirmed test booking more than one hour before its start. Confirm that the appointment is released and the refund remains pending until Razorpay reports its result. Test failure and uncertain/manual-review states; do not mark a refund successful merely because a request was accepted. To test webhook idempotency, use the provider dashboard’s retry/redelivery option for the same event, if available, and verify that the event is applied once.
+Keep public Render's `BOOKING_ENABLED=false`. Restart the local app after changing `.env`. Open `http://localhost:5173`, add a checkout-eligible service, choose an available date and one-hour arrival window, enter the customer's full name, phone, gender, and age, then press **Pay ₹100 advance**.
 
-This workspace currently cannot run these provider/database tests: there are no local MongoDB or Razorpay credentials and no isolated staging connection is configured.
+Use Razorpay's [test payment instructions](https://razorpay.com/docs/payments/payments/test-upi-details/). For a simulated UPI success, use the documented test VPA `success@razorpay`; use the documented failure test details to check a failed payment. Test mode simulates the result and transfers **no real money**. Confirm the payment in the Dashboard with Test Mode selected under **Transactions → Payments**, and confirm the app only confirms the appointment after server verification. Also check failed/cancelled checkout and webhook retry behavior.
 
-## D. Later: configure production safely
+## 5. When real money can be accepted
 
-1. Finish Razorpay account activation/business verification and confirm that Live API access is enabled in the owner’s dashboard. Test access does not prove production approval.
-2. Ensure the final public domain has a valid HTTPS certificate. The current custom-domain certificate had previously shown an error; use the valid HTTPS Render host only for isolated staging until the custom-domain certificate is resolved.
-3. After the salon owner approves the launch, switch the Razorpay Dashboard to Live Mode and generate a separate Live Key ID/Secret. In the production backend’s private environment set `RAZORPAY_MODE=live`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and a separately configured `RAZORPAY_WEBHOOK_SECRET`.
-4. Add a separate Live webhook at `https://dreambeautystudio.in/api/webhooks/razorpay` only after HTTPS is valid and the production deployment/database have been reviewed. Subscribe to the same five events. Keep production secrets in Render’s secret environment settings.
-5. Re-run the readiness and deployment checklist with the salon owner. Only then deliberately enable production booking. Do not use a real payment for a test.
+First finish private test-mode checks, approve the booking/privacy wording and service prices, verify the public HTTPS domain and database backups, and have the salon owner approve public checkout. Confirm Razorpay has activated Live payments for the account.
 
-## Code locations
+Only then generate separate Live API keys, set `RAZORPAY_MODE=live` and those keys in Render's **private environment settings**, create a separate Live webhook and secret, and deliberately enable public booking. Live keys start real transactions and are not a safe way to test. A real payment may incur Razorpay fees and should only be made by a consenting customer; confirm capture and settlement in the Live Dashboard.
 
-- Service prices, durations, and booking eligibility: `server/src/config/salon.js`
-- Fixed ₹100 advance and booking/payment/refund/webhook workflows: `server/src/booking/workflows.js`
-- Razorpay API calls and HMAC verification: `server/src/booking/razorpay.js`
-- Raw-body webhook endpoint: `server/src/app.js`
-- Checkout and booking summary: `client/src/BookingWidget.jsx`
-- Example environment names: `.env.example`
+The existing checkout already uses server-created orders, which is the right path for matching ₹100 payment with the chosen cart and arrival window. A standalone Razorpay payment link or QR may collect ₹100, but by itself it cannot confirm this site's booking or associate the payment with the selected services, time, and customer details.
+
+## Code and configuration locations
+
+- Menu and opening hours: `server/src/config/salon.js`
+- ₹100 order, booking holds, payment verification, refunds, and webhooks: `server/src/booking/workflows.js`
+- Razorpay requests and signature checks: `server/src/booking/razorpay.js`
+- Checkout UI: `client/src/BookingWidget.jsx`
+- Environment variable names (blank/example values only): `.env.example`

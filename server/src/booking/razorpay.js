@@ -64,6 +64,10 @@ export function fetchRazorpayPayment(paymentId) {
   return razorpayRequest(`/payments/${encodeURIComponent(paymentId)}`);
 }
 
+export function fetchRazorpayOrderPayments(orderId) {
+  return razorpayRequest(`/orders/${encodeURIComponent(orderId)}/payments`);
+}
+
 export function createRazorpayRefund({ paymentId, amountPaise, bookingReference, refundKey }) {
   return razorpayRequest(`/payments/${encodeURIComponent(paymentId)}/refund`, {
     method: 'POST',

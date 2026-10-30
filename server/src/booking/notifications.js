@@ -8,11 +8,16 @@ function formatWhen(booking) {
       dateStyle: 'full',
     }).format(new Date(`${booking.visitDate}T12:00:00.000Z`));
     if (booking.startAt) {
-      const arrival = new Intl.DateTimeFormat('en-IN', {
+      const formatter = new Intl.DateTimeFormat('en-IN', {
         timeZone: booking.salonTimezone,
         timeStyle: 'short',
-      }).format(new Date(booking.startAt));
-      return `${day} at ${arrival} (arrival time)`;
+      });
+      const arrivalStart = new Date(booking.startAt);
+      if (booking.arrivalWindowEndAt) {
+        const arrivalEnd = formatter.format(new Date(booking.arrivalWindowEndAt));
+        return `${day} between ${formatter.format(arrivalStart)} and ${arrivalEnd} (arrival window)`;
+      }
+      return `${day} at ${formatter.format(arrivalStart)} (arrival time)`;
     }
     const formatClock = (value) => {
       if (!/^\d{2}:\d{2}$/.test(value || '')) return value || '';
@@ -129,7 +134,12 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
         templateParameters: templateParameters(role, booking, when, serviceSummary, salonAdjustmentLine),
       } : {}),
       subject: `${statusText} · ${booking.reference}`,
-      text: [...detailLines, ...(note ? [`Note: ${note}`] : [])].join('\n'),
+      text: [
+        ...detailLines,
+        ...(role === 'owner' && booking.customer.gender ? [`Gender: ${booking.customer.gender}`] : []),
+        ...(role === 'owner' && Number.isInteger(booking.customer.age) ? [`Age: ${booking.customer.age}`] : []),
+        ...(note ? [`Note: ${note}`] : []),
+      ].join('\n'),
     };
     await Notification.updateOne(
       { dedupeKey: notification.dedupeKey },

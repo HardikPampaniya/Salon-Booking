@@ -1,13 +1,22 @@
-# Changelog
+﻿# Changelog
 
-## 2026-10-29 — service menu update for Render
+## 2026-10-29 - one-hour arrival windows
+
+- Removed the staff-roster, staff-schedule, and service-duration gates from arrival booking. Customers select a one-hour arrival window during salon hours; the salon does not promise service starts at that time.
+- Added customer gender and age with full name and phone to the checkout form and persisted booking record. Email and WhatsApp opt-in are no longer collected.
+- Updated the booking hold to reserve one customer per exact arrival window for ten minutes and create the fixed INR 100 Razorpay order.
+- Added styled checkout result messages and payment reconciliation for captured Test Mode orders. The cart clears only after the server confirms a booking; payment failures, expired holds, and refund states leave the customer's service selections intact.
+- Kept WhatsApp messaging pending and left public booking disabled. Updated README, API, deployment, status, and manual QA documentation.
+- Changes are local only; no commit or deployment was made.
+
+## 2026-10-29 â€” service menu update for Render
 
 - Organized the 200-service catalog into Women, Men, and Beauty services groups with subcategories, search/filter navigation, and category routes; preserved catalog IDs and prices. Beauty remains separate from Unisex until the owner confirms its audience.
 - Split each category page into services ready to add to cart and services that need studio confirmation; only the former show an Add to cart button. Home page picks now use cart-ready entries, and the copy explains that adding an item does not reserve an appointment.
 - Added `SERVICE_DATA_REVIEW.md` with all catalog entries, current amounts, menu selection/booking state, durations, source notes, and confirmation questions. Four discount-only items still lack a payable price; all 200 durations remain unset.
 - Added multi-service availability based on one automatically assigned employee who is eligible for every cart item. Appointment intervals include combined approved durations and respect staff/salon hours, breaks, leave, blocked periods, existing bookings, and active holds.
 - Uses unique per-employee 15-minute lock segments so different employees can serve overlapping appointments while the same employee cannot be double-booked.
-- Kept the fixed ₹100 advance server-created and linked to a booking hold; removed the standalone Razorpay Payment Button that was unrelated to the selected cart and time.
+- Kept the fixed â‚¹100 advance server-created and linked to a booking hold; removed the standalone Razorpay Payment Button that was unrelated to the selected cart and time.
 - Added `RAZORPAY_SETUP_GUIDE.md`; updated project, API, deployment, maintenance, and manual QA documentation for the current duration/staff-aware flow.
 - Public booking remains disabled. Provider-backed checkout/refund/webhook and browser visual QA require isolated staging and account setup. This update is on remote `main` for Render to fetch; confirm the deployment result in the Render dashboard.
 
@@ -16,15 +25,15 @@
 - Replaced the cart's full-page 15-minute arrival-time grid with a compact selector and scrollable modal; updated directions to the salon's supplied Maps link and changed Call the studio to the supplied WhatsApp number.
 - Added WhatsApp Cloud API booking confirmations for the salon owner and optionally opted-in customer after captured payment; added approved-template variables, persistent consent evidence, readiness settings, and no-blind-retry manual review behavior.
 - Documented Meta Cloud API setup, customer/owner Utility templates, Render secrets, and updated the Atlas/Razorpay launch checklist.
-- Added a persistent browser service cart from the home picks and category menus, with a consolidated booking page for one visit date/time and one ₹100 advance.
+- Added a persistent browser service cart from the home picks and category menus, with a consolidated booking page for one visit date/time and one â‚¹100 advance.
 - Extended booking holds to validate and snapshot up to 20 distinct services, calculate the combined total server-side, and include the itemized service list in booking management and email notifications.
 - Kept services with unresolved offer prices or unapproved names/package details visible but unavailable for checkout; documented the exact menu source file and live Razorpay website-verification staging steps in README.
 - Added service/date/15-minute arrival-time browsing using salon-local hours, future-time filtering, a 60-day date limit, and tomorrow as the default after closing. Booking hold remains disabled until database, Razorpay, notification, and policy setup is complete.
 - Replaced staff/service-duration slot calculations with one transactional arrival-time reservation per offered time; updated cancellation messaging and technical/manual QA documentation to describe the arrival-time model.
 - Added 153 individual prices from five newer handwritten menu photos, corrected three superseded prices, and moved the source photos from generated build output into the ignored private source-material folder.
-- Clarified that the supplied reusable Razorpay collection page is not the per-appointment ₹100 checkout. Documented the Test Mode API keys and staging webhook still needed.
+- Clarified that the supplied reusable Razorpay collection page is not the per-appointment â‚¹100 checkout. Documented the Test Mode API keys and staging webhook still needed.
 - Removed a MongoDB connection string from `.env.example`, documented password rotation, and clarified that a fresh URI belongs in the ignored root `.env`.
-- Recorded the owner's fixed ₹100 advance policy, including cash change returned after services priced below ₹100; updated customer and staff booking summaries.
+- Recorded the owner's fixed â‚¹100 advance policy, including cash change returned after services priced below â‚¹100; updated customer and staff booking summaries.
 - Changed booking readiness to require approval only for services selected to be bookable; deferred/unresolved menu entries stay off the booking form.
 - Added a beginner-friendly MongoDB Atlas and Razorpay test-mode walkthrough to the README and aligned server config loading with the documented root `.env` file.
 - Set every customer quote to a consistent 16px font with vertically centered slide content, and changed rotation to every four seconds.

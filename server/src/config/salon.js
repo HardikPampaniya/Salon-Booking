@@ -22,7 +22,7 @@ export const salon = {
     weeklyHours: dailyHours,
     breaks: [],
     blockedPeriods: [],
-    slotIntervalMinutes: 15,
+    slotIntervalMinutes: 60,
     ownerApproved: true,
     isPlaceholder: false,
   },
@@ -85,8 +85,7 @@ function serviceNavigation(category, name) {
   return { groupId, subcategory };
 }
 
-// Menu selection is separate from booking readiness: a priced, clear service may
-// be added to the cart, but booking also needs an approved duration and eligible staff.
+// Menu entries are checkout-eligible only when wording and a final payable price are approved.
 const service = (id, category, name, priceDisplay, description, priceRupees = null, needsConfirmation = false) => {
   const { groupId, subcategory } = serviceNavigation(category, name);
   const durationMinutes = null;
@@ -164,7 +163,7 @@ export const services = [
 ];
 
 // The owner supplied these newer handwritten menu photos. Preserve their latest
-// readable prices; keep durations and booking approval unset until confirmed.
+// readable prices; online arrival booking does not use service durations.
 const handwrittenMenuServices = [
   // Women's hair: blow-dry and hair spa.
   ['women-set-blow-dry', "Women's hair", 'Set blow-dry', 500],

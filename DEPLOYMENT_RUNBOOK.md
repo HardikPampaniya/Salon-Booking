@@ -1,69 +1,61 @@
-# Deployment runbook
+﻿# Deployment runbook
 
 ## Current state
 
-The public Render site is <https://dream-beauty-unisex-studio-karanjade.onrender.com/> and the Git remote points to `HardikPampaniya/Salon-Booking`. The service menu and cart-eligibility update is on remote `main`; confirm the corresponding build and deployment in Render. `render.yaml` keeps `BOOKING_ENABLED=false` and `STAFF_ROSTER_APPROVED=false`.
+The public Render site is <https://dream-beauty-unisex-studio-karanjade.onrender.com/>. `render.yaml` keeps `BOOKING_ENABLED=false`. The arrival-time checkout changes in the current workspace are not committed or deployed. Render environment values are private to the owner's dashboard and cannot be inspected here.
 
-Render environment variables are private to the owner’s dashboard; this workspace cannot inspect them. No separate staging deployment/database is configured. Do not use the production database for test payments or deploy unverified payment changes straight to the public service. Create an isolated staging service and database first, or keep the public booking gate off until staging and browser checks are complete.
+Do not run test payments against the production database or live Razorpay keys. Use a separate staging service and database, or leave public booking disabled until the private test flow and browser review pass.
 
-## MongoDB setup
+## MongoDB
 
-1. Use the salon’s existing Atlas project/cluster if it is healthy. Create a dedicated database user with access only to the app database; database login is separate from Atlas website login.
-2. Add the API host’s outbound IP ranges in Atlas Network Access. Restrict the list to the API host and development computer; do not use `0.0.0.0/0` for production.
-3. In Atlas, open the cluster’s **Connect → Drivers**, select Node.js, and copy the fresh connection URI. Use a database path such as `/salon_bookings` and URL-encode reserved password characters.
-4. Put the local URI in the ignored root `.env` as `MONGODB_URI=...`. Add staging/production URIs only in that Render service’s private environment settings. Keep separate databases for production and staging.
-5. This app requires MongoDB transactions for hold/employee locks. The server detects replica-set or sharded transaction support at startup. A standalone MongoDB deployment cannot safely run booking holds.
+1. Use the salon's existing Atlas cluster if healthy. Create a dedicated database user with access only to the app database.
+2. In Atlas Network Access, allow the API host's outbound IP ranges and the development computer as needed. Avoid `0.0.0.0/0` for production.
+3. In Atlas, open the cluster's **Connect > Drivers**, select Node.js, and copy the connection URI. Use a database path such as `/salon_bookings` and URL-encode reserved password characters.
+4. Put the local URI in the ignored root `.env` as `MONGODB_URI=...`. Add a separate staging URI only to staging's private Render environment.
+5. Booking holds require MongoDB transaction support (replica set or sharded deployment). The server detects transaction support at startup; do not set `MONGODB_TRANSACTIONS_SUPPORTED` manually.
 
-## Salon data and readiness
+## Booking configuration
 
-Before staging:
-
-1. Review `SERVICE_DATA_REVIEW.md`; keep all current owner-supplied prices. Provide an approved positive duration for each service to be offered online. Resolve the four percentage-only offers and the other flagged service wording/inclusions as desired.
-2. Configure each active employee’s eligible service IDs, full weekly hours, breaks, leave, and blocked times in the private staff data. Customers do not choose an employee; the server automatically assigns one eligible person for the whole cart.
-3. Confirm salon hours, holidays, schedule, automatic staff assignment, cancellation/refund, privacy, and retention policies. Use non-draft approved values for `BOOKING_POLICY_VERSION` and `PRIVACY_POLICY_VERSION`.
-4. Keep `STAFF_ROSTER_APPROVED=false` until the salon owner verifies staff coverage and schedules. `salon.bookingSchedule.ownerApproved` must only be true while the salon schedule is actually approved.
+1. Review `SERVICE_DATA_REVIEW.md`. Services with unresolved wording or no final payable price remain unavailable for checkout. No service duration or employee data is needed.
+2. Confirm the salon's weekly opening hours in `server/src/config/salon.js`. The current schedule is seven days, 9:00 AM-9:00 PM.
+3. Approve booking/cancellation terms and the privacy/data-retention wording. Set non-draft values for `BOOKING_POLICY_VERSION` and `PRIVACY_POLICY_VERSION` in the server environment.
+4. Keep `BOOKING_ENABLED=false` until staging checks are complete and the salon owner approves public checkout.
 
 ## Private staging service
 
-Create a separate Render service/branch or preview with a separate test database. Start with:
+Create a separate Render service/branch and use a separate transaction-capable database.
 
 | Variable | Staging value / note |
 | --- | --- |
 | `NODE_ENV` | `production` for a Render-hosted staging service. |
 | `MONGODB_URI` | Separate transaction-capable staging database. |
-| `BOOKING_ENABLED` | `false` until all staging prerequisites are supplied; turn on only in private staging to run the isolated end-to-end checks. |
-| `STAFF_ROSTER_APPROVED` | `false` until the actual test roster and schedules are approved. |
+| `BOOKING_ENABLED` | `false` until staging prerequisites are supplied; enable only in private staging for isolated checks. |
 | `SALON_TIMEZONE` | `Asia/Kolkata`. |
-| `RAZORPAY_MODE` | `test`; use only `rzp_test_` Key ID and test secret. |
+| `RAZORPAY_MODE` | `test`; use only an `rzp_test_` Key ID and test secret. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Test credentials, backend only. |
-| `RAZORPAY_WEBHOOK_SECRET` | Separate strong secret matching the Test Mode webhook. |
-| `NOTIFICATIONS_MODE` | `resend` or `whatsapp` with real staging provider credentials; production mock mode is not accepted. |
-| `BOOKING_POLICY_VERSION` / `PRIVACY_POLICY_VERSION` | Salon-approved versions; drafts keep readiness disabled. |
-| `OWNER_EMAIL`, `EMAIL_FROM`, `RESEND_API_KEY` | Required for Resend mode. Use a verified sender. |
-| `WHATSAPP_*` | Required for WhatsApp mode, including sender ID, access token, owner destination and approved customer/owner template names. |
-| `CLIENT_ORIGIN` | Exact staging web origin if frontend/API are separate origins. |
-| `TRUST_PROXY_HOPS` | Set to the value documented by the selected host. |
+| `RAZORPAY_WEBHOOK_SECRET` | Separate secret matching the Test Mode webhook. |
+| `BOOKING_POLICY_VERSION` / `PRIVACY_POLICY_VERSION` | Approved non-draft values. Draft values keep readiness disabled. |
+| `CLIENT_ORIGIN` | Exact web origin if frontend and API use separate origins. |
+| `TRUST_PROXY_HOPS` | Value documented by the selected host. |
 
-Set secrets using Render’s private Environment settings, not `render.yaml`, Git, or `VITE_*` variables. `MONGODB_TRANSACTIONS_SUPPORTED` is detected by the server at startup; do not set it by hand. Review `GET /api/health` and `GET /api/booking/readiness` for sanitized state.
+WhatsApp is not part of current booking readiness and is not sent. Configure it later only after the sender number, access token, approved templates, and owner/customer destinations are ready. Do not set WhatsApp mode now expecting it to work.
 
-## Razorpay test integration
+Set secrets in Render's private Environment settings, not `render.yaml`, Git, or `VITE_*` variables. Review `/api/health` and `/api/booking/readiness` for sanitized status.
 
-Follow [RAZORPAY_SETUP_GUIDE.md](RAZORPAY_SETUP_GUIDE.md) for Test Mode keys, an HTTPS webhook to `/api/webhooks/razorpay`, the separate webhook secret, success/failure checkouts, and refund checks. The existing app order is fixed to ₹100 and attached to the booking hold. A Razorpay payment link or standalone payment button is not the appointment checkout.
+## Razorpay staging
 
-The custom domain should not be used for production webhook URLs until its TLS certificate is valid. During setup use only a separate staging endpoint/database. Do not enable live payments here.
+Follow `RAZORPAY_SETUP_GUIDE.md` for Test Mode keys and an HTTPS webhook at `/api/webhooks/razorpay`. Keep the webhook secret separate from the API secret. The app creates a server-side Razorpay order for INR 100 only after it holds the selected cart and arrival slot. A payment link or standalone payment button is not the appointment checkout.
 
-## Verification before a release
+## Before deployment
 
-1. Run the project checks from the exact commit: `npm test`, `npm run build`, backend startup/health check, and `git diff --check`.
-2. Follow `MANUAL_QA_CHECKLIST.md` on desktop and mobile: category navigation and filtering, direct route refresh, accessibility, appointment durations, staff capacity, and customer wording.
-3. In private staging, test distinct eligible employees serving overlapping appointments, same-employee overlap rejection, concurrent holds, hold expiry, provider failures, duplicate webhooks, cancellation cutoff, refund final states, and real notification delivery.
-4. Confirm readiness is enabled only in staging and only after every condition is satisfied. Keep public `BOOKING_ENABLED=false` until salon owner sign-off.
-5. Review the full diff and make sure `.env`, private staff lists, menu scans, customer data, and `client/dist` are not included in a commit.
+1. Build and review the exact commit intended for deployment; check `git diff --check` and the existing automated suite.
+2. Follow `MANUAL_QA_CHECKLIST.md` on desktop/mobile, including the checkout fields and date/time selector.
+3. In private staging, verify successful and failed payments, signature verification, webhook idempotency, simultaneous requests for one arrival time, hold expiry, cancellation cutoff, refunds, and management access.
+4. Keep public `BOOKING_ENABLED=false` until those checks pass and the owner signs off.
+5. Check the exact branch tracked by Render. A push may auto-deploy to the public service.
 
-## Production release and rollback
+## Production and rollback
 
-The existing Render service is connected to GitHub and may auto-deploy a push to its tracked branch. A push is therefore a production change. Before deploying, verify the target branch and Render deploy settings in the owner’s dashboards, confirm a passing staging run and browser review, and agree on the release.
+For production, set the salon-approved database, matching Live Razorpay credentials and a separate Live webhook, exact origins, and valid HTTPS. Keep `BOOKING_ENABLED=false` until the owner explicitly approves launch. Live credentials must never be placed in the client or source control.
 
-For the production service, configure the salon-approved database, correct Live Razorpay keys and a separate Live webhook, verified notification sender/templates, exact origins, and valid HTTPS custom-domain certificate in Render’s private environment. Keep booking disabled until the owner explicitly approves launch. Live credentials are separate from test credentials; never put them in the client.
-
-If a deploy fails, use Render’s previous successful deploy/rollback control. Verify `/api/health` and the public pages after rollback. Do not roll back by deleting booking/payment database records or manually changing refund states. Keep encrypted backups and test restore against an isolated database before launch.
+If a deployment fails, use Render's prior successful deploy/rollback control. Verify `/api/health` and the public pages afterward. Do not delete booking/payment records or manually change refund states to roll back. Keep encrypted backups and test restoration against an isolated database.
