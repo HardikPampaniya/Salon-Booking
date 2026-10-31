@@ -19,7 +19,8 @@ Do not run test payments against the production database or live Razorpay keys. 
 1. Review `SERVICE_DATA_REVIEW.md`. Services with unresolved wording or no final payable price remain unavailable for checkout. No service duration or employee data is needed.
 2. Confirm the salon's weekly opening hours in `server/src/config/salon.js`. The current schedule is seven days, 9:00 AM-9:00 PM.
 3. Approve booking/cancellation terms and the privacy/data-retention wording. Set non-draft values for `BOOKING_POLICY_VERSION` and `PRIVACY_POLICY_VERSION` in the server environment.
-4. Keep `BOOKING_ENABLED=false` until staging checks are complete and the salon owner approves public checkout.
+4. Configure Resend email delivery (`NOTIFICATIONS_MODE=resend`, `RESEND_API_KEY`, a verified-domain `EMAIL_FROM`, and `OWNER_EMAIL`). Checkout asks customers for an email address and queues notices to both customer and owner after a confirmed payment.
+5. Keep `BOOKING_ENABLED=false` until staging checks are complete and the salon owner approves public checkout.
 
 ## Private staging service
 
@@ -30,6 +31,10 @@ Create a separate Render service/branch and use a separate transaction-capable d
 | `NODE_ENV` | `production` for a Render-hosted staging service. |
 | `MONGODB_URI` | Separate transaction-capable staging database. |
 | `BOOKING_ENABLED` | `false` until staging prerequisites are supplied; enable only in private staging for isolated checks. |
+| `NOTIFICATIONS_MODE` | `resend` for email; use `mock` only in local Razorpay Test Mode when real delivery is not intended. |
+| `RESEND_API_KEY` | Private Resend sending key. Never add it to Git or frontend code. |
+| `EMAIL_FROM` | Sender address on a domain verified in Resend. |
+| `OWNER_EMAIL` | Inbox for owner booking notifications. |
 | `SALON_TIMEZONE` | `Asia/Kolkata`. |
 | `RAZORPAY_MODE` | `test`; use only an `rzp_test_` Key ID and test secret. |
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Test credentials, backend only. |
@@ -38,7 +43,7 @@ Create a separate Render service/branch and use a separate transaction-capable d
 | `CLIENT_ORIGIN` | Exact web origin if frontend and API use separate origins. |
 | `TRUST_PROXY_HOPS` | Value documented by the selected host. |
 
-WhatsApp is not part of current booking readiness and is not sent. Configure it later only after the sender number, access token, approved templates, and owner/customer destinations are ready. Do not set WhatsApp mode now expecting it to work.
+WhatsApp is not used for booking confirmations. In production, booking readiness requires Resend email configuration; local Test Mode may use mock notifications, which are recorded but never sent.
 
 Set secrets in Render's private Environment settings, not `render.yaml`, Git, or `VITE_*` variables. Review `/api/health` and `/api/booking/readiness` for sanitized status.
 

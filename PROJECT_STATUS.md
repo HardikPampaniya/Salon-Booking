@@ -6,9 +6,10 @@
 - Checkout offers salon-local dates and one-hour arrival windows during configured opening hours. The selected window tells the salon when the customer plans to arrive; service may begin when the salon team is available.
 - One booking can hold a particular arrival window at a time. Holds expire after 10 minutes and conflicts use MongoDB transactions plus a unique arrival reservation.
 - Only active services with approved wording and a final payable price can enter checkout. Flagged entries and percentage-only offers without a final price remain blocked.
-- Customer details are limited to full name, phone, gender, and age. Those details are stored with the booking for later owner messaging.
+- Checkout collects full name, phone, email, gender, and age. Email is required for the customer confirmation; the saved customer details are used for owner email as well.
 - The payment order is fixed at INR 100 and the booking is confirmed only after trusted Razorpay payment verification.
-- After verification, the site shows the booking result. WhatsApp is not configured or sent; customer and owner message delivery remains pending.
+- After verified payment, the site shows the result and queues confirmation emails for the customer and owner through the existing Resend outbox. WhatsApp is not used.
+- Added a required customer email field, server validation/storage, Razorpay email prefill, and owner-email inclusion of the customer's contact details. Production readiness now requires Resend email configuration; local Test Mode can still use the non-delivery mock.
 - The cart shows date/time selection, the customer fields, and a Pay INR 100 advance button. The button remains disabled while server readiness is false.
 - `BOOKING_ENABLED` remains false in `render.yaml`; it is enabled in the local Test Mode configuration for checkout testing. This milestone has not been committed or deployed.
 - Replaced the stale Razorpay setup guide with the current test path: no staff/duration or WhatsApp requirement, isolated transaction-capable MongoDB, Test Mode keys/webhook, and separate Live-mode launch steps.
@@ -26,6 +27,7 @@
 - The browser flow has not yet been rerun with the captured Test Mode payment; restart the local app and use “Check payment status” to see whether the booking confirms or the late payment is refunded.
 - Local API health/readiness previously reported database and payments configured, booking enabled, and no readiness issues. Development CORS and payment-verification fixes require an API restart before the next local check.
 - No live Razorpay transaction, webhook, MongoDB transaction, notification delivery, or visual browser flow was verified.
+- The email integration edits in this pass have not been built, tested, or deployed.
 - The local Test Mode capture is visible in the Razorpay Dashboard; booking confirmation via the new recovery action has not yet been confirmed. This recovery change is local and has not been pushed or deployed.
 
 ## Remaining before enabling public checkout
@@ -33,7 +35,7 @@
 - In Render, verify MongoDB connectivity and transaction support, Razorpay mode/keys, webhook secret and endpoint, and the server environment values. Do not paste secrets into chat.
 - Approve final booking policy and privacy/data-retention wording, then set non-draft `BOOKING_POLICY_VERSION` and `PRIVACY_POLICY_VERSION` values in the server environment.
 - Run the staging payment flow with test credentials and a private transaction-capable database. Confirm INR 100 orders, successful/failed payment behavior, webhook processing, slot conflict, expiry, cancellation, and refund status.
-- Decide and configure the later customer and owner message channels. WhatsApp remains pending; approved templates and Meta API details are required before any WhatsApp message can be sent.
+- Configure Resend sender-domain verification, sending-only API key, sender address, and owner inbox in Render. Update the privacy notice to include customer email collection and Resend processing, then confirm both messages arrive after a Test Mode payment.
 - Confirm flagged service names and payable amounts in `SERVICE_DATA_REVIEW.md`. Unresolved entries are not checkout-eligible.
 - Review the checkout UI on desktop/mobile and complete the existing accessibility checklist.
 - Keep `BOOKING_ENABLED=false` until these checks and owner approval are complete.
@@ -43,5 +45,5 @@
 - The selected time reserves an arrival slot only; the system does not promise when service starts or estimate service duration.
 - Capacity is one customer per one-hour arrival window. The site does not store or assign employees.
 - Hours currently use the configured seven-day 9:00 AM-9:00 PM schedule. Special hours, holidays, breaks, and owner messaging are not managed by this flow.
-- Customer/owner WhatsApp messages are not active. No email address is collected.
-- Razorpay checkout code is present, but public booking/payment remains disabled and these latest changes have not been deployed.
+- Email delivery is not yet verified. Local `.env` is in mock mode and has no Resend API key; real email requires Resend setup and configuration in the target environment.
+- Razorpay checkout code is present, but public booking/payment remains disabled and the latest email changes have not been deployed.

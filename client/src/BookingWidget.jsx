@@ -173,7 +173,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const [startAt, setStartAt] = useState('');
   const [availability, setAvailability] = useState(null);
   const [availabilityState, setAvailabilityState] = useState('idle');
-  const [customer, setCustomer] = useState({ name: '', phone: '', gender: '', age: '' });
+  const [customer, setCustomer] = useState({ name: '', phone: '', email: '', gender: '', age: '' });
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -353,6 +353,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           startAt,
           name: customer.name,
           phone: customer.phone,
+          email: customer.email.trim().toLowerCase(),
           gender: customer.gender,
           age: Number(customer.age),
           managementToken: attemptRef.current.managementToken,
@@ -378,7 +379,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         currency: hold.payment.currency,
         name: salon.name,
         description: `${serviceIds.length} salon service${serviceIds.length === 1 ? '' : 's'} · ₹100 advance`,
-        prefill: { name: customer.name, contact: customer.phone },
+        prefill: { name: customer.name, contact: customer.phone, email: customer.email.trim() },
         notes: { booking_reference: hold.booking.reference },
         theme: { color: '#8e6258' },
         handler: async (paymentResponse) => {
@@ -453,6 +454,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const canSubmit = paymentEnabled && cartIsComplete && availabilityState === 'ready'
     && slots.some((slot) => slot.startAt === startAt) && customer.name.trim().length >= 2
     && customer.phone.trim().length >= 7 && ['male', 'female'].includes(customer.gender)
+    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())
     && Number.isInteger(Number(customer.age)) && Number(customer.age) >= 1 && Number(customer.age) <= 120
     && acceptedPolicy && !busy && !expiredPaymentNeedsCheck;
   const bookingOutcome = getBookingOutcome(managed, reconciledReference === managed?.booking?.reference);
@@ -534,6 +536,10 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
               </label>
               <label>Phone number
                 <input autoComplete="tel" inputMode="tel" maxLength={20} value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} />
+              </label>
+              <label>Email for confirmation
+                <input type="email" autoComplete="email" inputMode="email" maxLength={254} required value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} />
+                <span>We use this address to email your confirmation and booking updates.</span>
               </label>
               <label>Gender
                 <select value={customer.gender} onChange={(event) => setCustomer({ ...customer, gender: event.target.value })}>

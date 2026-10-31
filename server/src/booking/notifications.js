@@ -136,6 +136,7 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
       subject: `${statusText} · ${booking.reference}`,
       text: [
         ...detailLines,
+        ...(role === 'owner' && booking.customer.email ? [`Customer email: ${booking.customer.email}`] : []),
         ...(role === 'owner' && booking.customer.gender ? [`Gender: ${booking.customer.gender}`] : []),
         ...(role === 'owner' && Number.isInteger(booking.customer.age) ? [`Age: ${booking.customer.age}`] : []),
         ...(note ? [`Note: ${note}`] : []),

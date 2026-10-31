@@ -40,6 +40,7 @@ const bookingSchema = new mongoose.Schema({
     phone: { type: String, required: true, trim: true, maxlength: 20 },
     gender: { type: String, enum: ['male', 'female'] },
     age: { type: Number, min: 1, max: 120, validate: Number.isInteger },
+    // Optional for bookings created before email confirmations were added; new checkout requests require it.
     email: { type: String, trim: true, lowercase: true, maxlength: 254 },
     whatsappUpdatesOptIn: { type: Boolean, required: true, default: false },
     whatsappUpdatesOptInAt: { type: Date, default: null },

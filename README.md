@@ -35,7 +35,7 @@ The source of truth is [server/src/config/salon.js](server/src/config/salon.js).
 
 Online booking is intentionally **disabled** in `render.yaml` and the sample environment. The flow uses a transaction-capable MongoDB deployment, 10-minute holds, one-hour arrival windows, and a fixed INR 100 Razorpay advance attached to the selected cart. Only one booking can hold a particular arrival window at a time. The chosen window tells the salon when the customer plans to arrive; it does not promise the service starts then. No employee choice, staff schedule, or service duration is collected.
 
-Checkout collects only full name, phone, gender, and age. The server calculates the service subtotal, creates a Razorpay order for exactly INR 100, and confirms a booking only after it verifies payment. The advance is credited toward the service bill; if the service total is below INR 100, the studio returns the difference in cash after service.
+Checkout collects full name, phone, email, gender, and age. Email is required so the customer can receive the booking confirmation. The server calculates the service subtotal, creates a Razorpay order for exactly INR 100, and confirms a booking only after it verifies payment. The advance is credited toward the service bill; if the service total is below INR 100, the studio returns the difference in cash after service.
 
 Booking readiness requires:
 
@@ -44,7 +44,25 @@ Booking readiness requires:
 - Razorpay keys matching the selected Test/Live mode and a correctly configured webhook.
 - Approved booking and privacy policy versions, and `BOOKING_ENABLED=true` deliberately set for that environment.
 
-WhatsApp is not configured or sent. The customer sees the payment/booking result on the website; customer and owner message delivery remains pending. Booking details are stored for that later setup. No WhatsApp delivery is claimed.
+After verified payment, the notification outbox queues a confirmation email for the customer and a booking-details email for the owner. The owner email includes the customer's contact details, chosen services, arrival window, service total, and advance. Emails use Resend when `NOTIFICATIONS_MODE=resend` and its settings are configured; local Razorpay Test Mode can use `mock` without sending email. Booking readiness now requires a configured email transport in production. WhatsApp is not used for these confirmations.
+
+### Email notification setup
+
+1. Add a sender domain you control to Resend and verify it using the DNS records Resend displays. Resend recommends using a sending subdomain to keep booking-email reputation separate, for example `mail.dreambeautystudio.in`.
+2. Create a private Resend API key with **Sending access**, restricted to the verified sender domain if that option is offered.
+3. Set these variables in the server environment (Render Environment settings for the public service, or the root `.env` locally):
+
+   - `NOTIFICATIONS_MODE=resend`
+   - `RESEND_API_KEY` = the private Resend API key
+   - `EMAIL_FROM` = a sender address on the verified domain, for example `The Dream Beauty Studio <bookings@mail.dreambeautystudio.in>`
+   - `OWNER_EMAIL` = the inbox that should receive booking notices
+
+4. Save and redeploy/restart the server. Check `/api/booking/readiness` for `email_notifications_not_configured`; it must not appear before checkout can open.
+5. Use Razorpay Test Mode first and inboxes you can access. After a captured test payment, confirm that the customer and owner emails arrive; also check Resend's delivery log and spam folders. Then proceed with Live Mode.
+
+The email outbox is processed by the server worker. An email is queued only after server-side payment verification confirms the booking. Provider acceptance means Resend accepted the request; check its delivery log to confirm final delivery. Keep the API key private and out of frontend code, Git, and chat.
+
+Before enabling checkout, update and publish the privacy notice to explain that checkout collects the customer's email and uses Resend to send booking confirmations and updates. Approve the retention wording before changing `PRIVACY_POLICY_VERSION` from its draft value.
 
 No public appointment can currently be reserved and no payment should be collected through the website. Read [RAZORPAY_SETUP_GUIDE.md](RAZORPAY_SETUP_GUIDE.md), [DEPLOYMENT_RUNBOOK.md](DEPLOYMENT_RUNBOOK.md), and [MANUAL_QA_CHECKLIST.md](MANUAL_QA_CHECKLIST.md) before staging or launch.
 

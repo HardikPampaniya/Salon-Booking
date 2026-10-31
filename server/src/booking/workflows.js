@@ -12,6 +12,7 @@ import { getDailyScheduleWindow } from './availability.js';
 import { recordAuditEvent } from './audit.js';
 import { isCustomerCancellationAllowed, isVisitDateCancellationAllowed } from './cancellation-policy.js';
 import { queueBookingEvent } from './notifications.js';
+import { notificationConfiguration } from './notification-mode.js';
 import {
   createRazorpayOrder,
   createRazorpayRefund,
@@ -34,6 +35,7 @@ const rawHoldBodySchema = z.object({
   startAt: z.string().datetime({ offset: true }),
   name: z.string().trim().min(2).max(100),
   phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,20}$/),
+  email: z.string().trim().toLowerCase().email().max(254),
   gender: z.enum(['male', 'female']),
   age: z.number().int().min(1).max(120),
   managementToken: z.string().min(32).max(200),
@@ -117,6 +119,10 @@ export async function bookingReadiness() {
   if (salon.bookingSchedule.ownerApproved !== true) issues.push('salon_schedule_not_approved');
   if (POLICY_VERSION === 'draft-v1') issues.push('booking_policy_not_approved');
   if (PRIVACY_POLICY_VERSION === 'draft-v1') issues.push('privacy_policy_not_approved');
+  const notifications = notificationConfiguration();
+  if (!notifications.configured || (notifications.mode !== 'resend' && !notifications.mockAllowed)) {
+    issues.push(notifications.issue || 'email_notifications_required');
+  }
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || !process.env.RAZORPAY_WEBHOOK_SECRET) issues.push('razorpay_not_configured');
   else if (!razorpayModeMatches()) issues.push('razorpay_mode_mismatch');
   if (!bookingHorizonIsValid()) issues.push('booking_horizon_invalid');
@@ -172,6 +178,7 @@ function buildResponsePayload(booking, payment, managementToken) {
       customer: {
         name: booking.customer.name,
         phone: booking.customer.phone,
+        email: booking.customer.email,
         gender: booking.customer.gender,
         age: booking.customer.age,
       },
@@ -266,6 +273,7 @@ async function saveHold({ data, idempotencyKey }) {
             && existing.startAt?.getTime() === startAtDate.getTime()
             && existing.customer.name === data.name
             && existing.customer.phone === data.phone
+            && existing.customer.email === data.email
             && existing.customer.gender === data.gender
             && existing.customer.age === data.age;
           if (!sameRequest) throw fail(409, 'IDEMPOTENCY_KEY_REUSED', 'Booking details changed. Start a new booking request.');
@@ -321,6 +329,7 @@ async function saveHold({ data, idempotencyKey }) {
           customer: {
             name: data.name,
             phone: data.phone,
+            email: data.email,
             gender: data.gender,
             age: data.age,
           },
@@ -821,6 +830,7 @@ export async function getManagedBooking(request) {
       customer: {
         name: booking.customer.name,
         phone: booking.customer.phone,
+        email: booking.customer.email,
         gender: booking.customer.gender,
         age: booking.customer.age,
       },
