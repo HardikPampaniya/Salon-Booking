@@ -4,12 +4,12 @@
 
 ## Summary
 
-- Catalog size: **200 services**: Women 34, Men 30, Beauty services 136.
-- Configured numeric prices above zero: **196**; no payable price: **4**; zero/negative numeric prices: **0**.
-- Owner-confirmation flags: **30**. Menu-selectable: **170**. Online-bookable: **0**.
-- Approved durations: **0 of 200**.
+- Catalog size: **201 services**: Women 34, Men 30, Beauty services 137.
+- Configured numeric prices above zero: **197**; no payable price: **4**; zero/negative numeric prices: **0**.
+- Owner-confirmation flags: **30**. Menu-selectable: **171**. Online-bookable: **0**.
+- Approved durations: **0 of 201**.
 
-Readable salon prices are preserved. No duration or percentage-off payable price has been invented. Beauty stays a separate menu group and is not labelled Unisex because the intended audience has not been confirmed.
+Readable salon prices are preserved. The newest handwritten image was supplied on 2026-10-31 and overrides the older values for the facial, cleanup, and waxing entries it covers. Its local copy is in the ignored `docs/source-material/` folder. No duration or percentage-off payable price has been invented. Beauty stays a separate menu group and is not labelled Unisex because the intended audience has not been confirmed.
 
 ## 1. Missing and unclear pricing
 
@@ -36,7 +36,7 @@ There are no zero or negative numeric amounts in the current data. Entries with 
 
 ## 2. Missing durations
 
-All **200** services have no approved duration. For each service intended for online booking, provide the expected number of minutes to reserve, including setup/cleanup time when it prevents another visit. Browse-only services can remain without a duration.
+All **201** services have no approved duration. For each service intended for online booking, provide the expected number of minutes to reserve, including setup/cleanup time when it prevents another visit. Browse-only services can remain without a duration.
 
 The scanned PDF p. 10 notes durations for some massage services, but the matching durations have not been transcribed. Confirm the exact service match and minutes from that page; do not apply a general massage duration to a similarly named head-massage or package service.
 
@@ -173,7 +173,7 @@ The following configured prices are preserved, but the exact name, area, treatme
 | beauty-threading-side-jawline | Beauty services | Threading | Threading: side and jawline | ₹60 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-threading-full-face | Beauty services | Threading | Threading: full face | ₹200 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-advanced-sasa-facial | Beauty services | Facials & skin care | Sasa facial | ₹1,299 | Handwritten photo 01 | Not supplied | Yes | No | No |
-| beauty-advanced-aroma-diamond-facial | Beauty services | Facials & skin care | Aroma diamond facial | ₹1,599 | Handwritten photo 01 | Not supplied | Yes | No | No |
+| beauty-advanced-aroma-diamond-facial | Beauty services | Facials & skin care | Aroma diamond facial | ₹999 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-advanced-jovees-24k-gold-facial | Beauty services | Facials & skin care | Jovees 24K gold facial | ₹1,999 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-advanced-lotus-gold-facial | Beauty services | Facials & skin care | Lotus gold facial | ₹1,200 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-advanced-lotus-bridal-glow-facial | Beauty services | Facials & skin care | Lotus bridal glow facial | ₹1,399 | Handwritten photo 01 | Not supplied | Yes | No | No |
@@ -188,9 +188,10 @@ The following configured prices are preserved, but the exact name, area, treatme
 | beauty-tightening-mask | Beauty services | Facials & skin care | Tightening mask | ₹399 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-whitening-mask | Beauty services | Facials & skin care | Whitening mask | ₹399 | Handwritten photo 01 | Not supplied | Yes | No | No |
 | beauty-advanced-sasa-gold-facial | Beauty services | Facials & skin care | Sasa gold facial | ₹1,400 | Handwritten photo 01 | Not supplied | Yes | No | No |
-| beauty-basic-herbal-facial | Beauty services | Facials & skin care | Herbal facial | ₹700 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-basic-fruit-facial | Beauty services | Facials & skin care | Fruit facial | ₹600 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-basic-vlcc-facial | Beauty services | Facials & skin care | VLCC facial | ₹800 | Handwritten photo 02 | Not supplied | Yes | No | No |
+| beauty-basic-facial | Beauty services | Facials & skin care | Basic facial | ₹599 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-basic-herbal-facial | Beauty services | Facials & skin care | Herbal facial | ₹799 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-basic-fruit-facial | Beauty services | Facials & skin care | Mix fruit facial | ₹699 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-basic-vlcc-facial | Beauty services | Facials & skin care | VLCC facial | ₹799 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-basic-vlcc-anti-tan-facial | Beauty services | Facials & skin care | VLCC anti-tan facial | ₹1,000 | Handwritten photo 02 | Not supplied | Yes | No | No |
 | beauty-basic-lotus-herbal-facial | Beauty services | Facials & skin care | Lotus herbal facial | ₹1,000 | Handwritten photo 02 | Not supplied | Yes | No | No |
 | beauty-basic-aroma-anti-tan-facial | Beauty services | Facials & skin care | Aroma anti-tan facial | ₹1,200 | Handwritten photo 02 | Not supplied | Yes | No | No |
@@ -207,12 +208,12 @@ The following configured prices are preserved, but the exact name, area, treatme
 | beauty-cleanup-acne-skin | Beauty services | Clean-ups | Acne-skin cleanup | ₹1,200 | Handwritten photo 02 | Not supplied | Yes | No | No |
 | beauty-cleanup-lotus-gold | Beauty services | Clean-ups | Lotus gold cleanup | ₹800 | Handwritten photo 02 | Not supplied | Yes | No | No |
 | beauty-cleanup-lotus-diamond | Beauty services | Clean-ups | Lotus diamond cleanup | ₹1,800 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-cleanup-vlcc-insta-glow | Beauty services | Clean-ups | VLCC Insta Glow cleanup | ₹1,800 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-cleanup-aroma-diamond | Beauty services | Clean-ups | Aroma diamond cleanup | ₹1,000 | Handwritten photo 02 | Not supplied | Yes | No | No |
+| beauty-cleanup-vlcc-insta-glow | Beauty services | Clean-ups | VLCC Insta Glow cleanup | ₹999 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-cleanup-aroma-diamond | Beauty services | Clean-ups | Aroma diamond cleanup | ₹799 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-cleanup-mix-fruit | Beauty services | Clean-ups | Mixed fruit cleanup | ₹800 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-cleanup-o3 | Beauty services | Clean-ups | O3+ cleanup | ₹1,200 | Handwritten photo 02 | Not supplied | Yes | No | No |
+| beauty-cleanup-o3 | Beauty services | Clean-ups | O3+ cleanup | ₹1,099 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-cleanup-o3-whitening | Beauty services | Clean-ups | O3+ whitening cleanup | ₹1,200 | Handwritten photo 02 | Not supplied | Yes | No | No |
-| beauty-cleanup-hydra | Beauty services | Clean-ups | Hydra cleanup | ₹2,200 | Handwritten photo 02 | Not supplied | Yes | No | No |
+| beauty-cleanup-hydra | Beauty services | Clean-ups | Hydra cleanup with machine | ₹1,899 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-cleanup-sasa | Beauty services | Clean-ups | Sasa cleanup | ₹800 | Handwritten photo 02 | Not supplied | Yes | No | No |
 | beauty-body-polishing-full-body | Beauty services | Body care | Body polishing: full body | ₹5,000 | Handwritten photo 03 | Not supplied | Yes | No | No |
 | beauty-body-polishing-full-hand | Beauty services | Body care | Body polishing: full hand | ₹1,200 | Handwritten photo 03 | Not supplied | Yes | No | No |
@@ -268,20 +269,20 @@ The following configured prices are preserved, but the exact name, area, treatme
 | beauty-dtan-premium-full-tummy | Beauty services | Body care | Premium D-tan: full tummy | ₹1,000 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-dtan-premium-half-tummy | Beauty services | Body care | Premium D-tan: half tummy | ₹800 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-dtan-premium-full-body | Beauty services | Body care | Premium D-tan: full body | ₹5,900 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-regular-wax-full-hand | Beauty services | Waxing | Regular wax: full hand | ₹900 | Handwritten photo 04 | Not supplied | Yes | No | No |
+| beauty-regular-wax-full-hand | Beauty services | Waxing | Regular wax: full hand | ₹350 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-regular-wax-full-leg | Beauty services | Waxing | Regular wax: full leg | ₹800 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-regular-wax-three-quarter-leg | Beauty services | Waxing | Regular wax: three-quarter leg | ₹500 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-regular-wax-underarms | Beauty services | Waxing | Regular wax: underarms | ₹100 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-regular-wax-full-back | Beauty services | Waxing | Regular wax: full back | ₹600 | Handwritten photo 04 | Not supplied | Yes | No | No |
+| beauty-regular-wax-full-back | Beauty services | Waxing | Regular wax: back | ₹400 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-regular-wax-half-hand | Beauty services | Waxing | Regular wax: half hand | ₹200 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-regular-wax-bikini | Beauty services | Waxing | Regular wax: bikini | ₹2,000 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-regular-wax-full-body | Beauty services | Waxing | Regular wax: full body | ₹2,500 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-regular-wax-full-face | Beauty services | Waxing | Regular wax: full face | ₹400 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-rica-wax-full-leg | Beauty services | Waxing | Rica wax: full leg | ₹800 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-rica-wax-half-leg | Beauty services | Waxing | Rica wax: half leg | ₹600 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-rica-wax-full-hand | Beauty services | Waxing | Rica wax: full hand | ₹500 | Handwritten photo 04 | Not supplied | Yes | No | No |
+| beauty-rica-wax-full-leg | Beauty services | Waxing | Rica wax: full leg | ₹999 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-rica-wax-half-leg | Beauty services | Waxing | Rica wax: half leg | ₹599 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
+| beauty-rica-wax-full-hand | Beauty services | Waxing | Rica wax: full hand | ₹599 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-rica-wax-half-hand | Beauty services | Waxing | Rica wax: half hand | ₹350 | Handwritten photo 04 | Not supplied | Yes | No | No |
-| beauty-rica-wax-underarms | Beauty services | Waxing | Rica wax: underarms | ₹200 | Handwritten photo 04 | Not supplied | Yes | No | No |
+| beauty-rica-wax-underarms | Beauty services | Waxing | Rica wax: underarms | ₹250 | Latest handwritten photo 2026-10-31 | Not supplied | Yes | No | No |
 | beauty-rica-wax-full-back | Beauty services | Waxing | Rica wax: full back | ₹1,000 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-rica-wax-half-back | Beauty services | Waxing | Rica wax: half back | ₹500 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-rica-wax-full-body | Beauty services | Waxing | Rica wax: full body | ₹3,500 | Handwritten photo 04 | Not supplied | Yes | No | No |

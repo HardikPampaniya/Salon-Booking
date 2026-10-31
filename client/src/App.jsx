@@ -404,15 +404,19 @@ export default function App() {
   const { salon, services, categoryPages, apiState } = useSalonData();
   const [cartIds, setCartIds] = useState(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem('salon_service_cart') || '[]');
+      const saved = JSON.parse(sessionStorage.getItem('salon_service_cart') || '[]');
       return Array.isArray(saved) ? [...new Set(saved.filter((id) => typeof id === 'string'))].slice(0, 20) : [];
     } catch { return []; }
   });
   const route = resolveRoute(pathname);
 
   useEffect(() => {
-    try { localStorage.setItem('salon_service_cart', JSON.stringify(cartIds)); } catch { /* Cart remains available until this page closes. */ }
+    try { sessionStorage.setItem('salon_service_cart', JSON.stringify(cartIds)); } catch { /* The in-memory cart remains available for this page session. */ }
   }, [cartIds]);
+
+  useEffect(() => {
+    try { localStorage.removeItem('salon_service_cart'); } catch { /* Old persistent cart data is ignored. */ }
+  }, []);
 
   useEffect(() => {
     if (apiState !== 'ready') return;
@@ -430,7 +434,7 @@ export default function App() {
     const bookedIds = new Set(Array.isArray(serviceIds) ? serviceIds : []);
     if (!bookedIds.size) return;
     const remaining = cartIds.filter((id) => !bookedIds.has(id));
-    try { localStorage.setItem('salon_service_cart', JSON.stringify(remaining)); } catch { /* The in-memory cart is still cleared. */ }
+    try { sessionStorage.setItem('salon_service_cart', JSON.stringify(remaining)); } catch { /* The in-memory cart is still cleared. */ }
     setCartIds(remaining);
   }, [cartIds]);
 

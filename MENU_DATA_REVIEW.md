@@ -1,12 +1,12 @@
 # Menu data review
 
-> This file preserves the source transcription and PDF page reconciliation. For the current full 200-service catalog, current booking flags, missing prices, owner confirmations, and duration status, see [SERVICE_DATA_REVIEW.md](SERVICE_DATA_REVIEW.md). This newer report supersedes the older arrival-only booking notes below.
+> This file preserves the source transcription and PDF page reconciliation. For the current full 201-service catalog, current booking flags, missing prices, owner confirmations, and duration status, see [SERVICE_DATA_REVIEW.md](SERVICE_DATA_REVIEW.md). This newer report supersedes the older arrival-only booking notes below.
 
 ## Source status
 
 The salon supplied `docs/source-material/salon services.pdf`. It contains 18 image-only pages, so the text is not machine-searchable. All pages were visually reviewed. Pages 4 and 5 repeat the facial and cleanup sections from pages 1 and 2 with handwritten edits. Several other pages also have handwritten, crossed-out, or overwritten prices that do not identify a clear final amount.
 
-The owner later supplied five newer handwritten menu photos. They were copied from generated `client/dist/images/` output into the ignored `docs/source-material/` folder so a build will not remove them. The new photos are price-list references, not salon/service photography, so they are not displayed on the website. Their 153 readable menu entries are now in the site; where the same service is clearly identifiable, the newer handwritten price replaces the older value. The full menu now has 200 entries.
+The owner previously supplied five newer handwritten menu photos. They were copied from generated `client/dist/images/` output into the ignored `docs/source-material/` folder so a build will not remove them. A sixth handwritten beauty and waxing price photo was supplied on 2026-10-31; its local copy is `docs/source-material/beauty-wax-prices-2026-10-31.jpeg` in that ignored folder. These photos are price-list references, not salon/service photography, so they are not displayed on the website. Their readable prices are reflected in the menu, with the latest image overriding older values for matching services. The full menu now has 201 entries.
 
 The PDF contains a much broader menu than the 31 items transcribed in chat. The salon owner has confirmed that handwritten prices are current where they can be read. Sixteen clear, individual PDF services have been added as supplemental menu entries; chat-supplied package prices remain separate where the PDF lists individual services rather than the same package. The source remains in the ignored private source folder and is not served by the site.
 
@@ -86,6 +86,16 @@ All entries in this list are visible in the public menu. Services with a known p
 | Premium D-tan | Full face ₹500; full hand ₹800; half hand ₹600; full leg ₹1,000; half leg ₹700; full back ₹1,200; half back ₹750; underarms ₹450; feet ₹450; full tummy ₹1,000; half tummy ₹800; full body ₹5,900. |
 | Regular waxing | Full hand ₹900; full leg ₹800; three-quarter leg ₹500; underarms ₹100; full back ₹600; half hand ₹200; bikini ₹2,000; full body ₹2,500; full face ₹400. |
 | Rica waxing | Full leg ₹800; half leg ₹600; full hand ₹500; half hand ₹350; underarms ₹200; full back ₹1,000; half back ₹500; full body ₹3,500; bikini ₹3,000. |
+
+### Latest handwritten beauty and waxing photo
+
+The latest price source is archived at `docs/source-material/beauty-wax-prices-2026-10-31.jpeg` (originally supplied as `client/dist/images/WhatsApp Image 2026-10-31 at 3.44.42 PM.jpeg`). It supersedes older values above where they differ. The listed standalone items are enabled for cart selection because their names and prices are legible.
+
+| Group | Latest service names and prices |
+|---|---|
+| Facials | Sasa facial ₹1,299; Aroma diamond facial ₹999; Sasa gold facial ₹1,400; Herbal facial ₹799; Mix fruit facial ₹699; VLCC facial ₹799; Basic facial ₹599. |
+| Cleanups | VLCC Insta Glow cleanup ₹999; Aroma diamond cleanup ₹799; O3+ cleanup ₹1,099; Hydra cleanup with machine ₹1,899. Crossed-out earlier amounts are ignored. |
+| Waxing | Regular wax: full hand ₹350; regular wax: back ₹400; Rica wax: full leg ₹999; half leg ₹599; full hand ₹599; underarms ₹250. The standalone crossed-out “Regular wax ₹350” line is not added as a separate service. |
 
 ## Reconciliation
 
