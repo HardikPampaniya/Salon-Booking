@@ -7,6 +7,7 @@ const notificationSchema = new mongoose.Schema({
   to: { type: String, required: true },
   subject: { type: String, required: true },
   text: { type: String, required: true },
+  html: { type: String, default: null },
   templateName: { type: String, default: null, maxlength: 512 },
   templateLanguage: { type: String, default: null, maxlength: 20 },
   templateParameters: { type: [String], default: [] },

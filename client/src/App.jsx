@@ -382,7 +382,7 @@ function VisitSummary({ salon, compact = false }) {
 }
 
 function VisitPage({ salon }) {
-  return <main id="main" className="inner-page"><section className="page-hero section-shell"><PageHeading eyebrow="Come by" title="Visit the" accent="studio." copy="The Dream Beauty Unisex Studio is in Karanjade, Navi Mumbai. Call or message the studio with questions before your visit." /></section><VisitSummary salon={salon} /><section className="policy-summary section-shell" id="policies"><p className="eyebrow">Booking and cancellation</p><h2>Plan your<br /><em>salon visit.</em></h2><p>Choose an arrival time during salon hours. The selected time is your arrival time; the service begins when a team member is available. Online cancellation closes one hour before your selected arrival time. The fixed ₹100 online advance is credited against the bill; if a service costs less than ₹100, the studio returns the difference in cash after service. An eligible cancellation requests a refund of the full captured advance to the original payment method.</p><RouteLink className="text-link" to="/book">Book a salon visit <Arrow /></RouteLink></section></main>;
+  return <main id="main" className="inner-page"><section className="page-hero section-shell"><PageHeading eyebrow="Come by" title="Visit the" accent="studio." copy="The Dream Beauty Unisex Studio is in Karanjade, Navi Mumbai. Call or message the studio with questions before your visit." /></section><VisitSummary salon={salon} /><section className="policy-summary section-shell" id="policies"><p className="eyebrow">Payment and arrival</p><h2>Plan your<br /><em>salon visit.</em></h2><p>Choose an arrival time during salon hours. The selected time is your arrival time; the service begins when a team member is available. The fixed ₹100 online advance is credited against your service bill. If your services cost less than ₹100, the studio returns the difference in cash after your visit.</p><RouteLink className="text-link" to="/book">Book a salon visit <Arrow /></RouteLink></section></main>;
 }
 
 function BookPage({ salon, services, cartIds, onRemoveFromCart, onBrowseServices, onBookingConfirmed }) {
@@ -429,8 +429,10 @@ export default function App() {
   const removeBookedServicesFromCart = useCallback((serviceIds) => {
     const bookedIds = new Set(Array.isArray(serviceIds) ? serviceIds : []);
     if (!bookedIds.size) return;
-    setCartIds((current) => current.filter((id) => !bookedIds.has(id)));
-  }, []);
+    const remaining = cartIds.filter((id) => !bookedIds.has(id));
+    try { localStorage.setItem('salon_service_cart', JSON.stringify(remaining)); } catch { /* The in-memory cart is still cleared. */ }
+    setCartIds(remaining);
+  }, [cartIds]);
 
   const navigate = useCallback((to) => {
     const next = new URL(to, window.location.href);

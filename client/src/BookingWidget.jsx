@@ -112,22 +112,11 @@ function getBookingOutcome(managed, paymentWasChecked = false) {
   const { booking, payment, refund } = managed;
   const paymentStatus = payment?.status;
   const refundStatus = refund?.status;
-  const visit = booking.visitDate
-    ? `${formatVisitDate(booking.visitDate, booking.salonTimezone)}${booking.startAt ? `, ${formatArrivalWindow(booking.startAt, booking.arrivalWindowEndAt, booking.salonTimezone)}` : ''}`
-    : 'your selected time';
-
-  if (booking.status === 'confirmed' && paymentStatus === 'captured') {
-    return { tone: 'success', icon: '✓', title: 'Your payment was successful', body: `Your ₹100 advance was received. Your visit is confirmed for ${visit}.` };
-  }
   if (refundStatus === 'processed' || paymentStatus === 'refunded') {
-    return booking.status === 'cancelled'
-      ? { tone: 'info', icon: '↩', title: 'Your booking was cancelled and refunded', body: 'The ₹100 refund has been processed. Your services are still in your cart if you would like to book another visit.' }
-      : { tone: 'info', icon: '↩', title: 'Your booking was not confirmed; refund processed', body: 'The ₹100 payment has been refunded. Your services are still in your cart, so you can choose another arrival time.' };
+    return { tone: 'info', icon: '↩', title: 'Your booking was not confirmed; refund processed', body: 'The ₹100 payment has been refunded. Your services are still in your cart, so you can choose another arrival time.' };
   }
   if (paymentStatus === 'refund_pending' || ['pending', 'submitting', 'processing'].includes(refundStatus)) {
-    return booking.status === 'cancelled'
-      ? { tone: 'warning', icon: '↩', title: 'Your booking was cancelled; refund requested', body: 'A refund of your ₹100 advance has been requested. Your cart is saved.' }
-      : { tone: 'warning', icon: '↩', title: 'The visit was not confirmed; refund requested', body: 'The arrival hold expired before the payment could confirm the visit. A refund of your ₹100 advance has been requested. Your cart is saved.' };
+    return { tone: 'warning', icon: '↩', title: 'The visit was not confirmed; refund requested', body: 'The arrival hold expired before the payment could confirm the visit. A refund of your ₹100 advance has been requested. Your cart is saved.' };
   }
   if (paymentStatus === 'refund_failed' || refundStatus === 'failed' || refundStatus === 'manual_review' || paymentStatus === 'manual_review') {
     return { tone: 'warning', icon: '!', title: 'The salon is checking your payment', body: 'Your visit is not confirmed yet. The studio needs to review the payment or refund status. Please do not pay again; your cart is saved.' };
@@ -143,9 +132,6 @@ function getBookingOutcome(managed, paymentWasChecked = false) {
   if (paymentStatus === 'failed') {
     return { tone: 'error', icon: '×', title: 'Your payment did not go through', body: 'No visit was confirmed. Your services, date, and time are still selected so you can try again.' };
   }
-  if (booking.status === 'cancelled') {
-    return { tone: 'info', icon: 'i', title: 'This booking is cancelled', body: refundStatus === 'processed' ? 'The refund has been processed.' : 'Your services remain in the cart if you would like to make another booking.' };
-  }
   if (paymentStatus === 'authorized') {
     return { tone: 'pending', icon: '…', title: 'Payment confirmation is pending', body: 'Your payment is authorized but the visit is not confirmed yet. Keep this page open while we check the payment.' };
   }
@@ -156,7 +142,7 @@ function getBookingOutcome(managed, paymentWasChecked = false) {
 }
 
 function bookingStatusLabel(status) {
-  return ({ held: 'Awaiting payment', confirmed: 'Confirmed', expired: 'Expired · not confirmed', cancelled: 'Cancelled', manual_resolution: 'Needs salon review' })[status] || 'Pending';
+  return ({ held: 'Awaiting payment', confirmed: 'Confirmed', expired: 'Expired · not confirmed', manual_resolution: 'Needs salon review' })[status] || 'Pending';
 }
 
 function paymentStatusLabel(status) {
@@ -180,16 +166,29 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const [messageTone, setMessageTone] = useState('info');
   const [managed, setManaged] = useState(null);
   const [reconciledReference, setReconciledReference] = useState('');
-  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [successDetails, setSuccessDetails] = useState(null);
   const attemptRef = useRef(null);
   const managementRef = useRef(null);
+  const completionStartedRef = useRef(false);
   const timePickerRef = useRef(null);
   const timePickerTriggerRef = useRef(null);
+  const successDialogRef = useRef(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const showMessage = (text, tone = 'info') => {
     setMessage(text);
     setMessageTone(tone);
   };
+  function completeConfirmedPayment(serviceIds, reference) {
+    if (completionStartedRef.current) return;
+    completionStartedRef.current = true;
+    onBookingConfirmed(Array.isArray(serviceIds) && serviceIds.length ? serviceIds : cartIds);
+    attemptRef.current = null;
+    managementRef.current = null;
+    sessionStorage.removeItem('salon_booking_management');
+    sessionStorage.removeItem('salon_booking_attempt');
+    sessionStorage.setItem('salon_booking_success_flash', JSON.stringify({ reference: String(reference || '').slice(0, 80) }));
+    window.location.reload();
+  }
   const cartServices = cartIds.map((id) => services.find((service) => service.id === id)).filter(Boolean);
   const cartIsComplete = cartIds.length > 0 && cartIds.length <= 20
     && cartServices.length === cartIds.length && cartServices.every(isReadyToBook);
@@ -244,6 +243,20 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   }, [timePickerOpen]);
 
   useEffect(() => {
+    const dialog = successDialogRef.current;
+    if (!successDetails || !dialog) return undefined;
+    if (!dialog.open) dialog.showModal();
+    return () => { if (dialog.open) dialog.close(); };
+  }, [successDetails]);
+
+  useEffect(() => {
+    const successFlash = sessionStorage.getItem('salon_booking_success_flash');
+    if (successFlash) {
+      sessionStorage.removeItem('salon_booking_success_flash');
+      try { setSuccessDetails(JSON.parse(successFlash)); }
+      catch { setSuccessDetails({ reference: '' }); }
+      return;
+    }
     const saved = sessionStorage.getItem('salon_booking_management');
     if (!saved) return;
     try {
@@ -261,6 +274,11 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ reference }),
     }));
+    if (result.booking.status === 'confirmed') {
+      const bookedIds = (result.booking.services || []).map((service) => service.serviceId).filter(Boolean);
+      completeConfirmedPayment(bookedIds, result.booking.reference);
+      return result;
+    }
     setManaged(result);
     return result;
   }
@@ -276,24 +294,26 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ reference }),
       }));
-      setManaged(result);
       if (result.booking.status === 'confirmed') {
         const bookedIds = (result.booking.services || []).map((service) => service.serviceId).filter(Boolean);
-        onBookingConfirmed(bookedIds);
-        setReconciledReference('');
-        showMessage('Payment successful — your visit is confirmed.', 'success');
+        completeConfirmedPayment(bookedIds, result.booking.reference);
+        return;
       } else if (result.booking.status === 'expired' && ['created', 'failed'].includes(result.payment?.status)) {
+        setManaged(result);
         setReconciledReference(result.booking.reference);
         attemptRef.current = null;
         sessionStorage.removeItem('salon_booking_attempt');
         showMessage('No completed payment was found for the expired hold. Your cart is saved; you can choose an available time and try again.', 'info');
       } else if (result.booking.status === 'expired' && result.payment?.status === 'authorized') {
+        setManaged(result);
         showMessage('Razorpay reports an authorized payment, but it has not confirmed the visit. Do not pay again; check again shortly or contact the studio.', 'warning');
       } else if (result.payment?.status === 'refund_pending') {
+        setManaged(result);
         attemptRef.current = null;
         sessionStorage.removeItem('salon_booking_attempt');
         showMessage('Your booking was not confirmed. A refund for the captured advance has been requested.', 'warning');
       } else {
+        setManaged(result);
         showMessage('Razorpay has not confirmed this payment yet. Do not pay again while the status is pending.', 'warning');
       }
     } catch (error) {
@@ -309,20 +329,17 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ orderId: response.razorpay_order_id, paymentId: response.razorpay_payment_id, signature: response.razorpay_signature }),
     }));
-    setManaged(verification);
-    showMessage(verification.booking.status === 'confirmed'
-      ? 'Payment successful — your visit is confirmed.'
-      : verification.payment.status === 'refund_pending'
-        ? 'Your booking was not confirmed. A refund for the captured advance has been requested.'
-        : 'Your payment is being checked. Do not pay again while confirmation is pending.',
-    verification.booking.status === 'confirmed' ? 'success' : verification.payment.status === 'refund_pending' ? 'warning' : 'info');
     if (verification.booking.status === 'confirmed') {
       const bookedIds = (verification.booking.services || []).map((service) => service.serviceId).filter(Boolean);
-      onBookingConfirmed(bookedIds.length ? bookedIds : submittedServiceIds);
-      setReconciledReference('');
-      attemptRef.current = null;
-      sessionStorage.removeItem('salon_booking_attempt');
-    } else if (verification.payment.status === 'refund_pending') {
+      completeConfirmedPayment(bookedIds.length ? bookedIds : submittedServiceIds, verification.booking.reference);
+      return;
+    }
+    setManaged(verification);
+    showMessage(verification.payment.status === 'refund_pending'
+        ? 'Your booking was not confirmed. A refund for the captured advance has been requested.'
+        : 'Your payment is being checked. Do not pay again while confirmation is pending.',
+    verification.payment.status === 'refund_pending' ? 'warning' : 'info');
+    if (verification.payment.status === 'refund_pending') {
       attemptRef.current = null;
       sessionStorage.removeItem('salon_booking_attempt');
     }
@@ -364,10 +381,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       managementRef.current = management;
       sessionStorage.setItem('salon_booking_management', JSON.stringify(management));
       if (hold.booking.status === 'confirmed') {
-        await refreshManaged(management.reference, management.token);
-        onBookingConfirmed(serviceIds);
-        setReconciledReference('');
-        showMessage('Payment successful — your visit is confirmed.', 'success');
+        completeConfirmedPayment(serviceIds, hold.booking.reference);
         return;
       }
       if (!hold.payment) throw new Error('Payment setup is not ready. Your visit booking has not been confirmed.');
@@ -399,33 +413,6 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     } finally {
       setBusy(false);
     }
-  }
-
-  async function cancelManaged() {
-    if (!managementRef.current) return;
-    setBusy(true);
-    showMessage('');
-    try {
-      const { reference, token } = managementRef.current;
-      const result = await responseJson(await fetch(apiUrl('/api/bookings/cancel'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ reference }),
-      }));
-      setManaged(result);
-      setConfirmingCancel(false);
-      showMessage(result.refund?.status === 'processing' || result.refund?.status === 'pending'
-        ? 'Your visit booking is cancelled. The ₹100 refund is being processed; its status will update when the provider confirms it.'
-        : result.refund?.status === 'manual_review'
-          ? 'Your visit booking is cancelled. The salon is checking the refund status with the payment provider.'
-          : result.payment?.status === 'refund_failed'
-            ? 'Your visit booking is cancelled. The refund request failed, and the salon has been asked to review it.'
-            : result.payment?.status === 'authorized'
-              ? 'Your visit booking is cancelled. The payment is authorized but not captured; the salon will review it if the provider later reports a captured payment.'
-              : 'Your visit booking is cancelled.',
-      result.refund?.status === 'processing' || result.refund?.status === 'pending' || result.refund?.status === 'manual_review' ? 'warning' : 'info');
-    } catch (error) { showMessage(error.message, 'error'); }
-    finally { setBusy(false); }
   }
 
   useEffect(() => {
@@ -552,7 +539,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             </div>
             <label className="policy-consent">
               <input type="checkbox" checked={acceptedPolicy} onChange={(event) => setAcceptedPolicy(event.target.checked)} />
-              <span>I agree to the booking policy. The {formatMoney(ADVANCE_PAISE)} advance is credited against my service bill. If the services cost less than the advance, the studio returns the difference in cash after service. My selected time is an arrival window; the service may start when the salon team is available. I can request a full refund if I cancel at least one hour before the window begins.</span>
+              <span>I agree to the booking terms. The {formatMoney(ADVANCE_PAISE)} advance is credited against my service bill. If the services cost less than the advance, the studio returns the difference in cash after service. My selected time is an arrival window; the service may start when the salon team is available.</span>
             </label>
             {cartIsComplete && <p className="advance-summary">Service total {formatMoney(servicePricePaise)} · Pay {formatMoney(ADVANCE_PAISE)} once online now · {changeReturnedAfterServicePaise > 0 ? `${formatMoney(changeReturnedAfterServicePaise)} change returned in cash after service.` : remainingBalancePaise > 0 ? `${formatMoney(remainingBalancePaise)} balance paid at the salon.` : 'Nothing more is due at the salon.'}</p>}
             <button className="button button-light booking-submit" type="button" disabled={!canSubmit} onClick={startCheckout}>{busy ? 'Please wait…' : 'Pay ₹100 advance'} <span aria-hidden="true">↗</span></button>
@@ -577,13 +564,24 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         <p>Service total: <strong>{formatMoney(managed.booking.servicePricePaise)}</strong></p>
         {managed.booking.customer && <p>Customer: <strong>{managed.booking.customer.name}</strong> · {managed.booking.customer.phone} · {managed.booking.customer.gender} · age {managed.booking.customer.age}</p>}
         <p>Booking: <strong>{bookingStatusLabel(managed.booking.status)}</strong> · Payment: <strong>{paymentStatusLabel(managed.payment?.status)}</strong>{managed.refund && <> · Refund: <strong>{managed.refund.status === 'processed' ? 'Processed' : managed.refund.status === 'failed' ? 'Needs review' : managed.refund.status.replaceAll('_', ' ')}</strong></>}</p>
-        {((['held', 'expired'].includes(managed.booking.status) && ['created', 'authorized', 'failed'].includes(managed.payment?.status) && (managed.booking.status !== 'expired' || reconciledReference !== managed.booking.reference)) || (managed.booking.cancellationAllowed && !confirmingCancel)) && <div className="booking-management-actions">
+        {(['held', 'expired'].includes(managed.booking.status) && ['created', 'authorized', 'failed'].includes(managed.payment?.status) && (managed.booking.status !== 'expired' || reconciledReference !== managed.booking.reference)) && <div className="booking-management-actions">
           {['held', 'expired'].includes(managed.booking.status) && ['created', 'authorized', 'failed'].includes(managed.payment?.status) && (managed.booking.status !== 'expired' || reconciledReference !== managed.booking.reference) && <button className="booking-action-button booking-action-primary" type="button" disabled={busy} onClick={reconcileManagedPayment}>{busy ? 'Checking payment…' : 'Check payment status'}</button>}
-          {managed.booking.cancellationAllowed && !confirmingCancel && <button className="booking-action-button booking-action-secondary" type="button" disabled={busy} onClick={() => setConfirmingCancel(true)}>Cancel this booking</button>}
         </div>}
-        {['held', 'confirmed'].includes(managed.booking.status) && !managed.booking.cancellationAllowed && <p>Online cancellation closes one hour before your arrival time. Please contact the studio for help.</p>}
-        {confirmingCancel && <div className="cancel-confirm"><p>Cancel the visit booking? Online cancellation is available until one hour before arrival. Any captured ₹100 advance will be refunded to the original payment method.</p><button type="button" className="button button-light" disabled={busy} onClick={cancelManaged}>Confirm cancellation</button><button type="button" className="booking-cancel-link" onClick={() => setConfirmingCancel(false)}>Keep booking</button></div>}
       </div>}
+      {successDetails && <dialog
+        ref={successDialogRef}
+        className="payment-success-dialog"
+        aria-labelledby="payment-success-title"
+        aria-describedby="payment-success-copy"
+        onClose={() => setSuccessDetails(null)}
+      >
+        <div className="payment-success-mark" aria-hidden="true">✓</div>
+        <p className="eyebrow">The Dream Beauty Unisex Studio</p>
+        <h2 id="payment-success-title">Payment successful</h2>
+        <p id="payment-success-copy">Your ₹100 advance has been received and your visit is confirmed. Check your email for the booking details.</p>
+        {successDetails.reference && <p className="payment-success-reference">Booking reference <strong>{successDetails.reference}</strong></p>}
+        <button className="button button-dark payment-success-done" type="button" onClick={() => successDialogRef.current?.close()}>Done</button>
+      </dialog>}
     </div>
   );
 }

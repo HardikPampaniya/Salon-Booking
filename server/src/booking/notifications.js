@@ -39,6 +39,101 @@ function money(paise) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(paise / 100);
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character]);
+}
+
+function bookingEmail({ role, booking, salonName, statusText, eventType, when, services, note }) {
+  const isCustomer = role === 'customer';
+  const heading = eventType === 'confirmed'
+    ? (isCustomer ? 'Your visit is confirmed' : 'A new visit is confirmed')
+    : statusText;
+  const greeting = isCustomer
+    ? `Hello ${booking.customer.name}, your ₹100 advance payment was received and your visit is confirmed.`
+    : `A new salon visit is confirmed and the ₹100 advance payment was received. Review the appointment and customer details below.`;
+  const intro = eventType === 'confirmed'
+    ? greeting
+    : `${statusText}.${note ? ` ${note}` : ''}`;
+  const serviceRowsHtml = services.map((service) => `<tr>
+    <td style="padding:12px 14px;border-bottom:1px solid #eee5dc;color:#403a36;font-size:14px;line-height:1.5">${escapeHtml(service.serviceName || booking.serviceName || 'Salon service')}</td>
+    <td style="padding:12px 14px;border-bottom:1px solid #eee5dc;color:#403a36;font-size:14px;text-align:right;white-space:nowrap">${escapeHtml(money(service.pricePaise || 0))}</td>
+  </tr>`).join('');
+  const ownerRows = isCustomer ? '' : `<tr><td style="padding:8px 0;color:#786d64">Customer</td><td style="padding:8px 0;color:#403a36;font-weight:600">${escapeHtml(booking.customer.name)}</td></tr>
+    <tr><td style="padding:8px 0;color:#786d64">Phone</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.phone)}</td></tr>
+    ${booking.customer.email ? `<tr><td style="padding:8px 0;color:#786d64">Email</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.email)}</td></tr>` : ''}
+    ${booking.customer.gender ? `<tr><td style="padding:8px 0;color:#786d64">Gender</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.gender)}</td></tr>` : ''}
+    ${Number.isInteger(booking.customer.age) ? `<tr><td style="padding:8px 0;color:#786d64">Age</td><td style="padding:8px 0;color:#403a36">${booking.customer.age}</td></tr>` : ''}`;
+  const settlementLabel = booking.servicePricePaise < booking.advancePaise
+    ? 'Cash change to return after service'
+    : 'Remaining balance at the salon';
+  const settlementAmount = Math.abs(booking.servicePricePaise - booking.advancePaise);
+  const safeSalon = escapeHtml(salonName);
+  const safeWhen = escapeHtml(when);
+  const safeReference = escapeHtml(booking.reference);
+  const safeStatus = escapeHtml(statusText);
+  const timezoneLabel = booking.salonTimezone === 'Asia/Kolkata' ? 'India time' : booking.salonTimezone;
+  const settlementHtml = eventType === 'cancelled' || eventType.startsWith('refund')
+    ? `<tr><td style="padding:10px 14px;color:#786d64">Refund status</td><td style="padding:10px 14px;color:#403a36;text-align:right">${escapeHtml(note || 'Being checked with the payment provider')}</td></tr>`
+    : `<tr><td style="padding:10px 14px;color:#786d64">${escapeHtml(settlementLabel)}</td><td style="padding:10px 14px;color:#403a36;text-align:right">${escapeHtml(money(settlementAmount))}</td></tr>`;
+  const appointmentNotice = isCustomer
+    ? '<p style="margin:16px 0 0;color:#786d64;font-size:13px;line-height:1.7">Your selected time is an arrival window. The service may begin when the salon team is available.</p>'
+    : '';
+  const html = `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f5f1ec;font-family:Arial,Helvetica,sans-serif;color:#403a36">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(intro)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;margin:0 auto;background:#fffdfa;border:1px solid #e5d9ce">
+      <tr><td style="padding:26px 30px;background:#59473e;color:#fffaf5"><p style="margin:0 0 6px;color:#e7c3b4;font-size:11px;letter-spacing:1.5px;text-transform:uppercase">${safeSalon}</p><p style="margin:0;color:#fffaf5;font-size:13px">${safeStatus}</p></td></tr>
+      <tr><td style="padding:30px">
+        <h1 style="margin:0 0 10px;color:#403a36;font-family:Georgia,serif;font-size:30px;font-weight:400;line-height:1.2">${escapeHtml(heading)}</h1>
+        <p style="margin:0;color:#685d55;font-size:14px;line-height:1.7">${escapeHtml(intro)}</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:22px 0;background:#f8f2eb;border:1px solid #e5d9ce">
+          <tr><td style="padding:14px 16px;color:#786d64;font-size:12px">BOOKING REFERENCE</td></tr>
+          <tr><td style="padding:0 16px 15px;color:#403a36;font-size:17px;font-weight:700">${safeReference}</td></tr>
+          <tr><td style="padding:0 16px 7px;color:#786d64;font-size:12px">DATE AND ARRIVAL TIME (${escapeHtml(timezoneLabel)})</td></tr>
+          <tr><td style="padding:0 16px 15px;color:#403a36;font-size:14px;font-weight:600;line-height:1.5">${safeWhen}</td></tr>
+        </table>
+        ${ownerRows ? `<h2 style="margin:24px 0 8px;color:#403a36;font-family:Georgia,serif;font-size:20px;font-weight:400">Customer details</h2><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-bottom:1px solid #eee5dc">${ownerRows}</table>` : ''}
+        <h2 style="margin:24px 0 8px;color:#403a36;font-family:Georgia,serif;font-size:20px;font-weight:400">Services</h2>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #eee5dc"><thead><tr style="background:#f8f2eb"><th align="left" style="padding:10px 14px;color:#786d64;font-size:11px;font-weight:600;text-transform:uppercase">Service</th><th align="right" style="padding:10px 14px;color:#786d64;font-size:11px;font-weight:600;text-transform:uppercase">Price</th></tr></thead><tbody>${serviceRowsHtml}</tbody></table>
+        <h2 style="margin:24px 0 8px;color:#403a36;font-family:Georgia,serif;font-size:20px;font-weight:400">Payment summary</h2>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fbf9f5;border:1px solid #eee5dc">
+          <tr><td style="padding:10px 14px;color:#786d64">Service total</td><td style="padding:10px 14px;color:#403a36;text-align:right">${escapeHtml(money(booking.servicePricePaise))}</td></tr>
+          <tr><td style="padding:10px 14px;color:#786d64">Advance paid online</td><td style="padding:10px 14px;color:#403a36;text-align:right">${escapeHtml(money(booking.advancePaise))}</td></tr>
+          ${settlementHtml}
+        </table>
+        ${appointmentNotice}
+        <p style="margin:26px 0 0;padding-top:16px;border-top:1px solid #eee5dc;color:#91857b;font-size:11px;line-height:1.6">This is an automated message from ${safeSalon}. Please keep the booking reference for your records.</p>
+      </td></tr>
+    </table>
+  </body></html>`;
+  const text = [
+    salonName,
+    heading,
+    '',
+    intro,
+    `Booking reference: ${booking.reference}`,
+    `Date and arrival time (${timezoneLabel}): ${when}`,
+    ...(!isCustomer ? [
+      `Customer: ${booking.customer.name}`,
+      `Phone: ${booking.customer.phone}`,
+      ...(booking.customer.email ? [`Email: ${booking.customer.email}`] : []),
+      ...(booking.customer.gender ? [`Gender: ${booking.customer.gender}`] : []),
+      ...(Number.isInteger(booking.customer.age) ? [`Age: ${booking.customer.age}`] : []),
+    ] : []),
+    '',
+    'Services:',
+    ...services.map((service) => `- ${service.serviceName || booking.serviceName}: ${money(service.pricePaise || 0)}`),
+    `Service total: ${money(booking.servicePricePaise)}`,
+    `Advance paid online: ${money(booking.advancePaise)}`,
+    eventType === 'cancelled' || eventType.startsWith('refund')
+      ? `Refund status: ${note || 'Being checked with the payment provider'}`
+      : `${settlementLabel}: ${money(settlementAmount)}`,
+    ...(isCustomer ? ['', 'Your selected time is an arrival window. The service may begin when the salon team is available.'] : []),
+  ].join('\n');
+  return { html, text };
+}
+
 function whatsappNumber(value) {
   let digits = String(value || '').replace(/\D/g, '');
   if (digits.startsWith('00')) digits = digits.slice(2);
@@ -123,6 +218,21 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
   ];
   for (const { role, to } of recipients) {
     const whatsapp = mode.mode === 'whatsapp';
+    const email = whatsapp ? null : bookingEmail({
+      role,
+      booking,
+      salonName,
+      statusText,
+      eventType,
+      when,
+      services: booking.services?.length ? booking.services : [{ serviceName: booking.serviceName, pricePaise: booking.servicePricePaise }],
+      note,
+    });
+    const subject = role === 'customer' && eventType === 'confirmed'
+      ? `Your salon visit is confirmed · ${booking.reference}`
+      : role === 'owner' && eventType === 'confirmed'
+        ? `New salon booking · ${booking.reference}`
+        : `${statusText} · ${booking.reference}`;
     const notification = {
       dedupeKey: `${booking.id || booking._id}:${eventType}:${whatsapp ? 'whatsapp:' : ''}${role}`,
       bookingId: booking._id || booking.id,
@@ -133,8 +243,9 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
         templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE,
         templateParameters: templateParameters(role, booking, when, serviceSummary, salonAdjustmentLine),
       } : {}),
-      subject: `${statusText} · ${booking.reference}`,
-      text: [
+      subject,
+      ...(email ? { html: email.html } : {}),
+      text: email?.text || [
         ...detailLines,
         ...(role === 'owner' && booking.customer.email ? [`Customer email: ${booking.customer.email}`] : []),
         ...(role === 'owner' && booking.customer.gender ? [`Gender: ${booking.customer.gender}`] : []),
@@ -150,7 +261,7 @@ export async function queueBookingEvent(booking, eventType, { session, note = ''
   }
 }
 
-async function sendEmail({ dedupeKey, to, subject, text }) {
+async function sendEmail({ dedupeKey, to, subject, text, html }) {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
   if (!apiKey || !from) {
@@ -161,7 +272,7 @@ async function sendEmail({ dedupeKey, to, subject, text }) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Idempotency-Key': dedupeKey },
-    body: JSON.stringify({ from, to: [to], subject, text }),
+    body: JSON.stringify({ from, to: [to], subject, text, html: html || `<div style="font-family:Arial,sans-serif;white-space:pre-line">${escapeHtml(text)}</div>` }),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {

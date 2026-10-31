@@ -137,7 +137,7 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .booking-fields label { display: flex; flex-direction: column; gap: 7px; color: #574d46; font-size: 10px; font-weight: 600; text-align: left; }
 .booking-fields label span { display: inline; color: #82766e; font-weight: 400; }
 .booking-fields input, .booking-fields select { width: 100%; min-height: 42px; border: 1px solid #d9d0c7; border-radius: 0; padding: 0 11px; background: #fffdfa; color: #403a36; font: 400 12px "DM Sans", sans-serif; }
-.booking-fields input:focus, .booking-fields select:focus, .slot-choice:focus-visible, .booking-submit:focus-visible, .booking-cancel-link:focus-visible, .booking-action-button:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
+.booking-fields input:focus, .booking-fields select:focus, .slot-choice:focus-visible, .booking-submit:focus-visible, .booking-action-button:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
 .booking-fields label:first-child { grid-column: 1 / -1; }
 .slot-picker { min-width: 0; margin: 19px 0; padding: 0; border: 0; }
 .slot-picker legend { margin-bottom: 10px; color: #574d46; font-size: 10px; font-weight: 600; }
@@ -187,12 +187,17 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .booking-action-button { display: inline-flex; min-height: 42px; align-items: center; justify-content: center; border: 1px solid; padding: 0 16px; font: 600 10px "DM Sans", sans-serif; cursor: pointer; transition: background-color .18s ease, border-color .18s ease, color .18s ease; }
 .booking-action-primary { border-color: #59473e; background: #59473e; color: #fffaf5; }
 .booking-action-primary:hover:not(:disabled) { border-color: #403630; background: #403630; }
-.booking-action-secondary { border-color: #bda99a; background: #fffdfa; color: #70483f; }
-.booking-action-secondary:hover:not(:disabled) { border-color: #70483f; background: #f6eee7; }
 .booking-action-button:disabled { opacity: .55; cursor: wait; }
-.booking-cancel-link { display: inline-block; border: 0; margin: 7px 14px 0 0; padding: 4px 0; background: none; color: #70483f; font: 600 10px "DM Sans", sans-serif; text-decoration: underline; cursor: pointer; }
-.cancel-confirm { padding-top: 7px; }
-.cancel-confirm .button { border: 0; cursor: pointer; }
+.payment-success-dialog { width: min(460px, calc(100vw - 32px)); max-width: none; margin: auto; padding: clamp(28px, 6vw, 46px); border: 1px solid #d8c8ba; background: #fffdfa; color: #514943; box-shadow: 0 24px 90px #211d1b55; text-align: center; }
+.payment-success-dialog::backdrop { background: #211d1b99; backdrop-filter: blur(3px); }
+.payment-success-mark { width: 62px; height: 62px; display: grid; place-items: center; margin: 0 auto 19px; border: 1px solid #bfd0bf; border-radius: 50%; background: #eff6ef; color: #35613d; font: 400 30px/1 "DM Sans", sans-serif; }
+.payment-success-dialog .eyebrow { margin: 0 0 8px; color: #927265; font-size: 9px; }
+.payment-success-dialog h2 { margin: 0; color: #403a36; font: 400 clamp(27px, 5vw, 36px)/1.15 var(--serif); }
+.payment-success-dialog > p:not(.eyebrow) { margin: 12px 0 0; color: #685d55; font-size: 12px; line-height: 1.8; }
+.payment-success-dialog .payment-success-reference { padding: 11px 12px; border: 1px solid #e5d9ce; background: #f8f2eb; overflow-wrap: anywhere; }
+.payment-success-reference strong { display: block; margin-top: 3px; color: #403a36; }
+.payment-success-done { min-width: 130px; margin-top: 22px; border: 0; cursor: pointer; }
+.payment-success-done:focus-visible { outline: 3px solid #b77f70; outline-offset: 3px; }
 .booking-contact-link { display: inline-block; margin-top: 18px; color: #e7c3b4; font-size: 10px; }
 .booking-flower { position: absolute; color: #554c46; font-size: 250px; line-height: 1; }
 .flower-one { left: -65px; top: -54px; }
