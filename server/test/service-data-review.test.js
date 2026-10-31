@@ -30,11 +30,11 @@ describe('service data review report', () => {
   });
 
   it('reports the missing offer prices and the all-service duration gap', () => {
-    assert.match(report, /\*\*201\*\* services/);
+    assert.match(report, /\*\*207\*\* services/);
     assert.match(report, /women-botox - Botox treatment/);
     assert.match(report, /women-nanoplastia - Nanoplastia/);
     assert.match(report, /women-bioplastia - Bioplastia/);
     assert.match(report, /women-global-highlights - Global highlights/);
-    assert.match(report, /All \*\*201\*\* services have no approved duration/);
+    assert.match(report, /All \*\*207\*\* services have no approved duration/);
   });
 });

@@ -23,5 +23,5 @@ export function resolveRoute(pathname) {
 }
 
 export function servicesForCategory(services, category) {
-  return services.filter((service) => service.groupId === category || service.category === category);
+  return services.filter((service) => service.offerExpired !== true && (service.groupId === category || service.category === category));
 }

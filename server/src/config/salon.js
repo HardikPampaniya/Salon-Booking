@@ -59,6 +59,21 @@ export const serviceMenuGroups = [
   },
 ];
 
+export function isServiceCurrentlyAvailable(service, now = new Date()) {
+  if (service?.active !== true) return false;
+  if (!service.offerValidThrough) return true;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: salon.timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now).map(({ type, value }) => [type, value]));
+  const localDate = `${parts.year}-${parts.month}-${parts.day}`;
+  return localDate <= service.offerValidThrough;
+}
+
+export function isServiceAvailableOnDate(service, date) {
+  return isServiceCurrentlyAvailable(service) && (!service.offerValidThrough || date <= service.offerValidThrough);
+}
+
 function serviceNavigation(category, name) {
   const groupId = category === "Women's hair" ? 'women'
     : category === "Men's services" ? 'men'
@@ -336,3 +351,18 @@ for (const [id, category, name, priceRupees, needsConfirmation = false] of handw
   const priceDisplay = `₹${new Intl.NumberFormat('en-IN').format(priceRupees)}`;
   services.push(service(id, category, name, priceDisplay, 'Price supplied by the salon.', priceRupees, needsConfirmation));
 }
+
+const diwaliOfferServices = [
+  ['beauty-diwali-package-999', 'Diwali all-in package - Cleanup', 'Cleanup, bleach, arms wax, underarms wax, and threading.', 999],
+  ['beauty-diwali-package-1599', 'Diwali all-in package - Organic facial', 'Organic facial, bleach, arms wax, underarms wax, half legs wax, and threading.', 1599],
+  ['beauty-diwali-package-2099', 'Diwali all-in package - Fruit facial', 'Fruit facial, bleach, arms wax, underarms wax, half legs wax, and pedicure.', 2099],
+  ['beauty-diwali-package-2599', 'Diwali all-in package - D-Tan / Shehnaz facial', 'D-Tan / Shehnaz facial, bleach, arms wax, underarms wax, full legs wax, pedicure and manicure, and threading.', 2599],
+  ['beauty-diwali-package-2999', 'Diwali all-in package - Aloe vera facial', 'Aloe vera facial, bleach, arms wax, underarms wax, full legs wax, manicure and pedicure, and threading.', 2999],
+  ['beauty-diwali-package-3499', 'Diwali all-in package - Aloe vera facial + roots touchup', 'Aloe vera facial, bleach, arms wax, underarms wax, full legs wax, pedicure, threading, and roots touchup.', 3499],
+].map(([id, name, description, priceRupees]) => ({
+  ...service(id, 'Beauty services', name, new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(priceRupees), description, priceRupees),
+  isDiwaliOffer: true,
+  offerValidThrough: '2026-11-08',
+}));
+
+services.push(...diwaliOfferServices);

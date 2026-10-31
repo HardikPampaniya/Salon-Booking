@@ -164,8 +164,15 @@ function getServiceDetails(service) {
 }
 
 function isCartSelectable(service) {
-  return service.menuSelectable === true && service.needsConfirmation !== true
+  return service.active === true && service.menuSelectable === true && service.needsConfirmation !== true
     && Number.isFinite(service.priceRupees) && service.priceRupees > 0;
+}
+
+function offerEndLabel(service) {
+  if (!service.offerValidThrough) return 'Limited-time offer';
+  const [year, month, day] = service.offerValidThrough.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return `Valid through ${new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date)}`;
 }
 
 function ServiceCard({ service, index, compact = false, cartIds, addToCart, removeFromCart }) {
@@ -173,12 +180,12 @@ function ServiceCard({ service, index, compact = false, cartIds, addToCart, remo
   const canAddToCart = isCartSelectable(service);
   const price = service.priceDisplay || (Number.isFinite(service.priceRupees)
     ? `₹${new Intl.NumberFormat('en-IN').format(service.priceRupees)}` : 'Price to be confirmed');
-  return <article className={`service-card${compact ? ' service-card-compact' : ''}`}>
-    <div className="service-card-top"><span>{String(index + 1).padStart(2, '0')}</span><span className="service-sparkle" aria-hidden="true">✳</span></div>
+  return <article className={`service-card${compact ? ' service-card-compact' : ''}${service.isDiwaliOffer ? ' service-card-diwali' : ''}`}>
+    <div className="service-card-top"><span>{service.isDiwaliOffer ? <span className="diwali-card-badge">DIWALI DHAMAKA</span> : String(index + 1).padStart(2, '0')}</span><span className="service-sparkle" aria-hidden="true">✳</span></div>
     <h3>{service.name}</h3>
     {service.needsConfirmation && <p className="service-confirmation">Needs studio confirmation · not available in cart</p>}
     {getServiceDetails(service) && <p className="service-details">{getServiceDetails(service)}</p>}
-    <div className="service-meta"><span>{Number.isInteger(service.durationMinutes) && service.durationMinutes > 0 ? `${service.durationMinutes} minute visit` : 'Duration to be confirmed'}</span><strong>{price}</strong></div>
+    <div className="service-meta"><span>{service.isDiwaliOffer ? offerEndLabel(service) : Number.isInteger(service.durationMinutes) && service.durationMinutes > 0 ? `${service.durationMinutes} minute visit` : 'Duration to be confirmed'}</span><strong>{price}</strong></div>
     {canAddToCart
       ? <button className={`service-cart-button${inCart ? ' is-added' : ''}`} type="button" disabled={!inCart && cartIds.length >= 20} onClick={() => inCart ? removeFromCart(service.id) : addToCart(service.id)} aria-pressed={inCart}>{inCart ? 'Remove from cart' : cartIds.length >= 20 ? 'Cart limit reached' : 'Add to cart'} <span aria-hidden="true">{inCart ? '−' : '+'}</span></button>
       : <p className="service-cart-unavailable">{service.needsConfirmation ? 'Add to cart will appear after the studio confirms the details below.' : 'Not currently available to add to cart.'}</p>}
@@ -217,6 +224,11 @@ function HomePage({ salon, services, categoryPages, apiState, cartIds, addToCart
       <div className="intro-layout"><h2>Hair, beauty,<br /><em>and grooming.</em></h2><div className="intro-copy"><p>{salon.name} offers salon services in Karanjade, Navi Mumbai. Browse the menu by category and contact the studio directly with questions about a treatment or package.</p><RouteLink className="text-link" to="/our-story">About the studio <Arrow /></RouteLink></div></div>
       <div className="intro-stats"><span>01 <small>Women’s hair</small></span><span>02 <small>Beauty services</small></span><span>03 <small>Men’s services</small></span></div>
     </section>
+
+    {apiState === 'ready' && services.some((service) => service.isDiwaliOffer && isCartSelectable(service)) && <section className="diwali-offer-banner section-shell" aria-labelledby="home-diwali-title">
+      <div><p className="eyebrow">Limited-time festive offers</p><h2 id="home-diwali-title">Diwali Dhamaka.<br /><em>All-in packages from ₹999.</em></h2><p>Explore six beauty packages at their Diwali prices. Valid for arrival dates through 8 November 2026.</p></div>
+      <RouteLink className="button button-dark" to="/services/beauty">Explore Diwali offers <Arrow /></RouteLink>
+    </section>}
 
     <section className="home-categories section-shell"><div className="section-heading"><div><p className="eyebrow">Explore the menu</p><h2>Find your<br /><em>service.</em></h2></div><p>Choose a category to view the full salon menu, prices, and details that still need confirmation.</p></div><CategoryCards services={services} categoryPages={categoryPages} /></section>
 
@@ -330,7 +342,8 @@ function ServiceCategoryPage({ category, services, categoryPages, apiState, cart
   const subcategories = [...new Set(items.map((service) => service.subcategory).filter(Boolean))];
   const filtered = items.filter((service) => `${service.name} ${service.description} ${service.subcategory || ''}`.toLowerCase().includes(query.toLowerCase().trim())
     && (subcategory === 'All services' || service.subcategory === subcategory));
-  const cartReadyServices = filtered.filter(isCartSelectable);
+  const diwaliOffers = filtered.filter((service) => service.isDiwaliOffer && isCartSelectable(service));
+  const cartReadyServices = filtered.filter((service) => !service.isDiwaliOffer && isCartSelectable(service));
   const confirmationServices = filtered.filter((service) => !isCartSelectable(service));
   const title = groupInfo?.name || categoryInfo?.name || category;
   const imageCategory = groupInfo?.imageCategory || categoryInfo?.imageCategory || category;
@@ -346,6 +359,10 @@ function ServiceCategoryPage({ category, services, categoryPages, apiState, cart
       {apiState === 'loading' && <p className="api-note" role="status">Preparing the service menu…</p>}
       {apiState === 'fallback' && <p className="api-note" role="alert">The service menu is temporarily unavailable. Please contact the studio.</p>}
       {apiState === 'ready' && filtered.length > 0 && <div className="service-menu-groups">
+        {diwaliOffers.length > 0 && <section className="service-menu-group diwali-offers" aria-labelledby={`${groupId}-diwali-title`}>
+          <div className="service-menu-group-heading"><div><p className="eyebrow">Festive package prices · valid through 8 November 2026</p><h3 id={`${groupId}-diwali-title`}>Diwali Dhamaka offers</h3><p>All-in beauty packages at the prices shown on the salon’s Diwali offer flyer.</p></div><span>{diwaliOffers.length} offer{diwaliOffers.length === 1 ? '' : 's'}</span></div>
+          <div className="service-list-grid">{diwaliOffers.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>
+        </section>}
         {cartReadyServices.length > 0 && <section className="service-menu-group" aria-labelledby={`${groupId}-cart-ready-title`}>
           <div className="service-menu-group-heading"><div><p className="eyebrow">Current menu price and details</p><h3 id={`${groupId}-cart-ready-title`}>Ready to add to your cart</h3><p>Adding a service saves your selection; it does not reserve an appointment.</p></div><span>{cartReadyServices.length} service{cartReadyServices.length === 1 ? '' : 's'}</span></div>
           <div className="service-list-grid">{cartReadyServices.map((service, index) => <ServiceCard service={service} index={index} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} key={service.id} />)}</div>
@@ -420,7 +437,7 @@ export default function App() {
 
   useEffect(() => {
     if (apiState !== 'ready') return;
-    const knownIds = new Set(services.map((service) => service.id));
+    const knownIds = new Set(services.filter((service) => !service.offerExpired).map((service) => service.id));
     setCartIds((current) => current.filter((id) => knownIds.has(id)));
   }, [apiState, services]);
 

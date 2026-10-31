@@ -30,7 +30,7 @@ describe('public API foundation', () => {
     assert.ok(response.body.services.every((service) => service.id && service.name
       && service.menuSelectable === (service.active === true && Number.isFinite(service.priceRupees) && service.priceRupees > 0 && service.needsConfirmation !== true)
       && service.bookable === (service.menuSelectable && Number.isInteger(service.durationMinutes) && service.durationMinutes > 0)));
-    assert.equal(response.body.services.length, 201);
+    assert.equal(response.body.services.length, 207);
     assert.deepEqual(response.body.groups.map(({ id }) => id), ['women', 'men', 'beauty']);
     assert.ok(response.body.services.every((service) => response.body.groups.some((group) => group.id === service.groupId)));
     assert.deepEqual(response.body.groups.map(({ path }) => path), ['/services/women', '/services/men', '/services/beauty']);

@@ -18,10 +18,12 @@
 - A captured Test Mode payment was reported in Razorpay, but its browser callback had failed and the booking still showed `held`. Do not pay again. After restarting the local API, use the booking's “Check payment status” button to reconcile it; confirmation/refund outcome still needs to be observed in the browser.
 - Added the recovery API call to the existing Razorpay order-payments endpoint. See [Razorpay Fetch Payments for an Order](https://razorpay.com/docs/api/orders/fetch-payments/).
 - Added a clear checkout outcome panel for successful, failed, expired, authorized, and refund states. A confirmed booking removes only its booked services from the cart; unsuccessful or expired bookings keep the cart and form selections. Expired orders must be checked before checkout can be retried, and the server distinguishes captured, authorized, failed, and mismatched order payments.
+- Added six Diwali all-in beauty packages from the supplied flyer, with highlighted cards on the home and Beauty pages, cart selection at the flyer prices, and server-side expiry for arrival dates after 8 November 2026.
 
 ## Verification
 
 - No test suite was run for this change.
+- `git diff --check` passed for the Diwali menu, expiry, and presentation changes. Build and tests were not run in this pass.
 - `npm run build` passed after the checkout outcome and cart changes (Vite 7.3.7, 33 modules).
 - Server JavaScript syntax checks and `git diff --check` passed after the payment recovery and checkout UI changes.
 - The browser flow has not yet been rerun with the captured Test Mode payment; restart the local app and use “Check payment status” to see whether the booking confirms or the late payment is refunded.

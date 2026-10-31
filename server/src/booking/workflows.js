@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import mongoose from 'mongoose';
 import { z } from 'zod';
-import { salon, services } from '../config/salon.js';
+import { isServiceAvailableOnDate, isServiceCurrentlyAvailable, salon, services } from '../config/salon.js';
 import { Booking } from '../models/Booking.js';
 import { ArrivalReservation } from '../models/ArrivalReservation.js';
 import { Payment } from '../models/Payment.js';
@@ -126,7 +126,7 @@ export async function bookingReadiness() {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET || !process.env.RAZORPAY_WEBHOOK_SECRET) issues.push('razorpay_not_configured');
   else if (!razorpayModeMatches()) issues.push('razorpay_mode_mismatch');
   if (!bookingHorizonIsValid()) issues.push('booking_horizon_invalid');
-  const eligibleServices = services.filter((service) => service.menuSelectable === true && service.active === true);
+  const eligibleServices = services.filter((service) => service.menuSelectable === true && isServiceCurrentlyAvailable(service));
   if (salon.bookingSchedule.isPlaceholder || eligibleServices.length === 0) issues.push('salon_configuration_incomplete');
   return {
     enabled: bookingReady() && issues.length === 0,
@@ -198,7 +198,9 @@ function buildResponsePayload(booking, payment, managementToken) {
 async function saveHold({ data, idempotencyKey }) {
   const selectedServices = data.serviceIds.map((id) => services.find((service) => service.id === id));
   if (selectedServices.some((service) => !service)) throw fail(404, 'SERVICE_NOT_FOUND', 'One or more selected services are no longer available.');
-  if (selectedServices.some((service) => service.active !== true || service.menuSelectable !== true || service.needsConfirmation === true
+  const dateLimitedOffer = selectedServices.find((service) => service.offerValidThrough && data.date > service.offerValidThrough);
+  if (dateLimitedOffer) throw fail(400, 'OFFER_EXPIRED', `This Diwali offer is available for arrival dates through ${dateLimitedOffer.offerValidThrough}. Choose an earlier date or remove it from your cart.`);
+  if (selectedServices.some((service) => !isServiceAvailableOnDate(service, data.date) || service.menuSelectable !== true || service.needsConfirmation === true
     || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0) || salon.bookingSchedule.isPlaceholder) {
     throw fail(503, 'SALON_CONFIGURATION_INCOMPLETE', 'One or more selected services are not yet approved for online booking.');
   }

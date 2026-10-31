@@ -1,14 +1,27 @@
 # Menu data review
 
-> This file preserves the source transcription and PDF page reconciliation. For the current full 201-service catalog, current booking flags, missing prices, owner confirmations, and duration status, see [SERVICE_DATA_REVIEW.md](SERVICE_DATA_REVIEW.md). This newer report supersedes the older arrival-only booking notes below.
+> This file preserves the source transcription and PDF page reconciliation. For the current full 207-service catalog, current booking flags, missing prices, owner confirmations, and duration status, see [SERVICE_DATA_REVIEW.md](SERVICE_DATA_REVIEW.md). This newer report supersedes the older arrival-only booking notes below.
 
 ## Source status
 
 The salon supplied `docs/source-material/salon services.pdf`. It contains 18 image-only pages, so the text is not machine-searchable. All pages were visually reviewed. Pages 4 and 5 repeat the facial and cleanup sections from pages 1 and 2 with handwritten edits. Several other pages also have handwritten, crossed-out, or overwritten prices that do not identify a clear final amount.
 
-The owner previously supplied five newer handwritten menu photos. They were copied from generated `client/dist/images/` output into the ignored `docs/source-material/` folder so a build will not remove them. A sixth handwritten beauty and waxing price photo was supplied on 2026-10-31; its local copy is `docs/source-material/beauty-wax-prices-2026-10-31.jpeg` in that ignored folder. These photos are price-list references, not salon/service photography, so they are not displayed on the website. Their readable prices are reflected in the menu, with the latest image overriding older values for matching services. The full menu now has 201 entries.
+The owner previously supplied five newer handwritten menu photos. They were copied from generated `client/dist/images/` output into the ignored `docs/source-material/` folder so a build will not remove them. A sixth handwritten beauty and waxing price photo was supplied on 2026-10-31; its local copy is `docs/source-material/beauty-wax-prices-2026-10-31.jpeg` in that ignored folder. The Diwali flyer `WhatsApp Image 2026-10-31 at 3.54.52 PM.jpeg` adds six festive packages at fixed prices; those prices and inclusions are shown in the Beauty menu through 8 November 2026. These source photos are not displayed as service photography. The full menu now has 207 entries.
 
 The PDF contains a much broader menu than the 31 items transcribed in chat. The salon owner has confirmed that handwritten prices are current where they can be read. Sixteen clear, individual PDF services have been added as supplemental menu entries; chat-supplied package prices remain separate where the PDF lists individual services rather than the same package. The source remains in the ignored private source folder and is not served by the site.
+
+## Diwali offer transcription
+
+The flyer says “Valid till Diwali.” The offers are displayed with the printed package price, without an inferred original price or percentage reduction. The website accepts these prices for arrival dates through 8 November 2026 and rejects bookings using a later arrival date.
+
+| Package price | Flyer inclusions |
+|---:|---|
+| ₹999 | Cleanup, bleach, arms wax, underarms, threading |
+| ₹1,599 | Organic facial, bleach, arms wax, underarms, half legs wax, threading |
+| ₹2,099 | Fruit facial, bleach, arms wax, underarms, half legs wax, pedicure |
+| ₹2,599 | D-Tan / Shehnaz facial (flyer wording preserved; slash meaning not specified), bleach, arms wax, underarms, full legs wax, pedicure and manicure, threading |
+| ₹2,999 | Aloe vera facial, bleach, arms wax, underarms, full legs wax, manicure and pedicure, threading |
+| ₹3,499 | Aloe vera facial, bleach, arms wax, underarms, full legs wax, pedicure, threading, roots touchup |
 
 ## Owner's latest decisions
 

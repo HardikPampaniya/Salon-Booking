@@ -72,12 +72,22 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .intro-copy p, .section-heading > p { color: #776f68; font-size: 13px; line-height: 1.9; max-width: 375px; margin-bottom: 22px; }
 .intro-stats { border-top: 1px solid #d4c9bd; margin-top: 67px; padding-top: 19px; display: grid; grid-template-columns: repeat(3, 1fr); color: #a27d6f; font-family: var(--serif); font-size: 21px; }
 .intro-stats small { display: block; margin-top: 8px; font: 10px "DM Sans", sans-serif; color: #756c64; }
+.diwali-offer-banner { display: flex; align-items: center; justify-content: space-between; gap: 32px; padding-top: 44px; padding-bottom: 44px; background: #e8d8c8; }
+.diwali-offer-banner .eyebrow { margin-bottom: 11px; color: #855945; }
+.diwali-offer-banner h2 { margin: 0; color: #3f352e; font: 400 clamp(28px, 3.5vw, 43px)/1.12 var(--serif); }
+.diwali-offer-banner h2 em { color: #9c604c; }
+.diwali-offer-banner > div > p:last-child { margin: 12px 0 0; color: #67584d; font-size: 11px; line-height: 1.7; }
+.diwali-offer-banner .button { flex: 0 0 auto; }
 .services-section { padding-top: 113px; padding-bottom: 118px; background: #fbf9f5; }
 .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 50px; margin-bottom: 45px; }
 .section-heading .eyebrow { margin-bottom: 18px; }
 .section-heading > p { max-width: 270px; margin-bottom: 5px; }
 .services-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .service-card { min-height: 224px; padding: 23px 23px 18px; display: flex; flex-direction: column; background: #f1ebe3; transition: transform .25s, background .25s; }
+.service-card-diwali { border: 1px solid #d1a96a; background: #f3e7d5; }
+.service-card-diwali:hover { background: #f0dfc5; }
+.diwali-card-badge { display: inline-block; padding: 5px 8px; background: #80523c; color: #fffaf3; font: 700 8px "DM Sans", sans-serif; letter-spacing: .1em; }
+.service-card-diwali .service-meta strong { color: #77452f; font-size: 15px; }
 .service-card:hover { transform: translateY(-4px); background: #eee4da; }
 .service-card-top { display: flex; align-items: center; justify-content: space-between; color: #a17a6d; font: 11px var(--serif); }
 .service-sparkle { font-size: 17px; }
@@ -385,6 +395,9 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .service-menu-group-heading p:not(.eyebrow) { margin: 7px 0 0; color: #796d64; font-size: 10px; line-height: 1.7; }
 .service-menu-group-heading > span { flex: 0 0 auto; color: #796d64; font-size: 10px; }
 .service-menu-group-pending .service-card { background: #eee8e1; }
+.diwali-offers { padding: 23px; background: #f6eee3; border: 1px solid #e0c9a7; }
+.diwali-offers .service-menu-group-heading .eyebrow { color: #80523c; }
+.diwali-offers .service-list-grid .service-card { min-height: 235px; }
 .service-list-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .service-list-grid .service-card { min-height: 206px; }
 .service-list-section > .placeholder-note { max-width: 760px; margin: 26px 0; color: #796d64; font-size: 11px; line-height: 1.8; }
@@ -509,6 +522,9 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
   .visual-caption small { font-size: 8px; }
   .home-categories { padding-top: 67px; padding-bottom: 86px; }
   .home-picks { padding-top: 86px; padding-bottom: 68px; }
+  .diwali-offer-banner { align-items: stretch; flex-direction: column; gap: 20px; padding-top: 32px; padding-bottom: 32px; }
+  .diwali-offer-banner .button { align-self: flex-start; }
+  .diwali-offers { padding: 15px; }
   .home-picks .services-grid { grid-template-columns: 1fr; }
   .service-card-compact { min-height: 164px; }
   .menu-note { display: block; padding-top: 21px; padding-bottom: 58px; }

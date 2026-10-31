@@ -4,12 +4,14 @@
 
 ## Summary
 
-- Catalog size: **201 services**: Women 34, Men 30, Beauty services 137.
-- Configured numeric prices above zero: **197**; no payable price: **4**; zero/negative numeric prices: **0**.
-- Owner-confirmation flags: **30**. Menu-selectable: **171**. Online-bookable: **0**.
-- Approved durations: **0 of 201**.
+- Catalog size: **207 services**: Women 34, Men 30, Beauty services 143.
+- Configured numeric prices above zero: **203**; no payable price: **4**; zero/negative numeric prices: **0**.
+- Owner-confirmation flags: **30**. Menu-selectable: **177** through 8 November 2026 (171 regular services plus six Diwali offers). Online-bookable: **0**.
+- Approved durations: **0 of 207**.
 
 Readable salon prices are preserved. The newest handwritten image was supplied on 2026-10-31 and overrides the older values for the facial, cleanup, and waxing entries it covers. Its local copy is in the ignored `docs/source-material/` folder. No duration or percentage-off payable price has been invented. Beauty stays a separate menu group and is not labelled Unisex because the intended audience has not been confirmed.
+
+The Diwali flyer `WhatsApp Image 2026-10-31 at 3.54.52 PM.jpeg` supplies six fixed-price all-in beauty packages. They are marked as Diwali offers on the site and cannot be booked for arrival dates after 8 November 2026. The offer prices are not presented with an invented crossed-out/base price. The flyer uses “D-Tan / Shehnaz facial”; that wording is kept without assuming whether the slash means a choice or a combined package.
 
 ## 1. Missing and unclear pricing
 
@@ -36,7 +38,7 @@ There are no zero or negative numeric amounts in the current data. Entries with 
 
 ## 2. Missing durations
 
-All **201** services have no approved duration. For each service intended for online booking, provide the expected number of minutes to reserve, including setup/cleanup time when it prevents another visit. Browse-only services can remain without a duration.
+All **207** services have no approved duration. For each service intended for online booking, provide the expected number of minutes to reserve, including setup/cleanup time when it prevents another visit. Browse-only services can remain without a duration.
 
 The scanned PDF p. 10 notes durations for some massage services, but the matching durations have not been transcribed. Confirm the exact service match and minutes from that page; do not apply a general massage duration to a similarly named head-massage or package service.
 
@@ -287,6 +289,12 @@ The following configured prices are preserved, but the exact name, area, treatme
 | beauty-rica-wax-half-back | Beauty services | Waxing | Rica wax: half back | ₹500 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-rica-wax-full-body | Beauty services | Waxing | Rica wax: full body | ₹3,500 | Handwritten photo 04 | Not supplied | Yes | No | No |
 | beauty-rica-wax-bikini | Beauty services | Waxing | Rica wax: bikini | ₹3,000 | Handwritten photo 04 | Not supplied | Yes | No | No |
+| beauty-diwali-package-999 | Beauty services | Clean-ups | Diwali all-in package - Cleanup | ₹999 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
+| beauty-diwali-package-1599 | Beauty services | Facials & skin care | Diwali all-in package - Organic facial | ₹1,599 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
+| beauty-diwali-package-2099 | Beauty services | Facials & skin care | Diwali all-in package - Fruit facial | ₹2,099 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
+| beauty-diwali-package-2599 | Beauty services | Facials & skin care | Diwali all-in package - D-Tan / Shehnaz facial | ₹2,599 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
+| beauty-diwali-package-2999 | Beauty services | Facials & skin care | Diwali all-in package - Aloe vera facial | ₹2,999 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
+| beauty-diwali-package-3499 | Beauty services | Facials & skin care | Diwali all-in package - Aloe vera facial + roots touchup | ₹3,499 | Diwali offer flyer (2026-10-31) | Not supplied | Yes | No | No |
 
 ## Source files
 

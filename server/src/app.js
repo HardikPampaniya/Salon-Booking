@@ -17,7 +17,7 @@ import {
   processRazorpayWebhook,
   verifyCheckoutPayment,
 } from './booking/workflows.js';
-import { salon, serviceMenuGroups, services } from './config/salon.js';
+import { isServiceAvailableOnDate, isServiceCurrentlyAvailable, salon, serviceMenuGroups, services } from './config/salon.js';
 import { ArrivalReservation } from './models/ArrivalReservation.js';
 import { Booking } from './models/Booking.js';
 
@@ -143,7 +143,11 @@ export function createApp() {
   });
 
   app.get('/api/services', (_request, response) => {
-    response.json({ services, groups: serviceMenuGroups });
+    const currentServices = services.map((service) => {
+      if (isServiceCurrentlyAvailable(service)) return service;
+      return { ...service, active: false, menuSelectable: false, bookable: false, offerExpired: Boolean(service.offerValidThrough) };
+    });
+    response.json({ services: currentServices, groups: serviceMenuGroups });
   });
 
   const bookingWriteLimit = rateLimit({ windowMs: 60_000, limit: 8, standardHeaders: 'draft-8', legacyHeaders: false });
@@ -190,8 +194,12 @@ export function createApp() {
 
     try {
       const { date } = parsed.data;
+      const dateLimitedOffer = selectedServices.find((service) => service.offerValidThrough && date > service.offerValidThrough);
+      if (dateLimitedOffer) {
+        return response.status(400).json({ error: { code: 'OFFER_EXPIRED', message: `This Diwali offer is available for arrival dates through ${dateLimitedOffer.offerValidThrough}. Choose an earlier date or remove it from your cart.` } });
+      }
       const schedule = salon.bookingSchedule;
-      if (schedule.isPlaceholder || schedule.ownerApproved !== true || selectedServices.some((service) => service.active !== true || service.menuSelectable !== true
+      if (schedule.isPlaceholder || schedule.ownerApproved !== true || selectedServices.some((service) => !isServiceAvailableOnDate(service, date) || service.menuSelectable !== true
         || service.needsConfirmation === true || !Number.isFinite(service.priceRupees) || service.priceRupees <= 0)) {
         return response.status(503).json({ error: { code: 'BOOKING_SETUP_INCOMPLETE', message: 'One or more selected services are not yet approved for online booking.' } });
       }
