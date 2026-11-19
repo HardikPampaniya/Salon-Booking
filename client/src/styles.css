@@ -33,7 +33,7 @@ a:hover .arrow-icon { transform: translate(2px, -2px); }
 .brand-name { font-family: var(--serif); font-size: 17px; letter-spacing: .01em; }
 .brand-name small { display: block; margin-top: 3px; font: 700 7px "DM Sans", sans-serif; letter-spacing: .19em; color: #8f8177; }
 .primary-nav { display: flex; align-items: center; gap: clamp(20px, 3vw, 44px); font-size: 11px; color: #544d47; }
-.primary-nav > a:not(.nav-cta):hover, .footer-links a:hover { color: #a66f61; }
+.primary-nav > a:not(.nav-cta):hover, .footer-links a:hover, .footer-links button:hover { color: #a66f61; }
 .nav-cta { border-bottom: 1px solid #a66f61; padding: 10px 0; color: #754e44; }
 .menu-toggle { display: none; }
 .hero { min-height: 650px; padding: 38px 7.2% 64px; display: grid; grid-template-columns: .89fr 1.11fr; align-items: center; gap: 5.4%; background: #f8f5f0; position: relative; overflow: hidden; }
@@ -225,6 +225,7 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .footer-brand .brand-mark { width: 34px; height: 34px; font-size: 21px; }
 .footer-brand .brand-name { font-size: 14px; }
 .footer-links { display: flex; gap: 24px; color: #72685f; font-size: 9px; }
+.footer-links button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .site-footer > p { margin: 0; color: #8a7e73; font-size: 9px; }
 .policy-drafts { padding: 22px 7.2%; display: grid; grid-template-columns: 1fr; gap: 8px; background: #ece5dd; color: #796e65; font-size: 10px; }
 .policy-drafts h2 { margin: 8px 0 0; font: 700 11px "DM Sans", sans-serif; }
@@ -318,16 +319,13 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 }
 
 .marketing-consent { position: fixed; right: 18px; bottom: 18px; z-index: 10000; width: min(440px, calc(100vw - 36px)); max-height: min(80vh, 380px); overflow-y: auto; padding: 16px; border: 1px solid #cbb9aa; background: #fffdfa; color: #403a36; box-shadow: 0 12px 36px #211d1b2b; }
-.marketing-consent:not(.is-open) { width: auto; max-height: none; overflow: visible; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .marketing-consent-copy strong { display: block; margin-bottom: 6px; font: 600 13px "DM Sans", sans-serif; }
 .marketing-consent-copy p { margin: 0; color: #685d55; font-size: 11px; line-height: 1.6; }
 .marketing-consent-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 13px; }
 .marketing-consent-actions button, .marketing-consent-settings { min-height: 38px; border: 1px solid #aa8879; padding: 0 12px; background: #fffdfa; color: #604d43; font: 600 10px "DM Sans", sans-serif; cursor: pointer; }
 .marketing-consent-actions .marketing-consent-accept { border-color: #59473e; background: #59473e; color: #fffaf5; }
-.marketing-consent-settings { display: inline-flex; align-items: center; justify-content: center; position: static; transform: none; white-space: nowrap; background: #fffdfa; box-shadow: 0 4px 14px #211d1b1a; }
 @media (max-width: 520px) {
   .marketing-consent { right: 10px; bottom: 10px; width: calc(100vw - 20px); padding: 13px; }
-  .marketing-consent:not(.is-open) { width: auto; padding: 0; }
   .marketing-consent-copy p { font-size: 10px; }
 }
 

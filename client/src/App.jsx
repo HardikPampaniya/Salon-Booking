@@ -125,38 +125,35 @@ function SiteHeader({ salon, cartCount }) {
   </>;
 }
 
-function SiteFooter({ salon }) {
+function SiteFooter({ salon, onOpenMarketingSettings }) {
   return <footer className="site-footer">
     <Brand salon={salon} footer />
-    <div className="footer-links"><RouteLink to="/services">Services</RouteLink><RouteLink to="/visit-us">Visit us</RouteLink><RouteLink to="/book">Booking status</RouteLink></div>
+    <div className="footer-links"><RouteLink to="/services">Services</RouteLink><RouteLink to="/visit-us">Visit us</RouteLink><RouteLink to="/book">Booking status</RouteLink>{onOpenMarketingSettings && <button type="button" onClick={onOpenMarketingSettings}>Ad measurement settings</button>}</div>
     <p>© {new Date().getFullYear()} {salon.name}</p>
   </footer>;
 }
 
-function PageFrame({ salon, cartCount, children }) {
+function PageFrame({ salon, cartCount, children, onOpenMarketingSettings }) {
   return <>
     <a className="skip-link" href="#main">Skip to content</a>
     <SiteHeader salon={salon} cartCount={cartCount} />
     {children}
-    <SiteFooter salon={salon} />
+    <SiteFooter salon={salon} onOpenMarketingSettings={onOpenMarketingSettings} />
   </>;
 }
 
-function MarketingConsentControl({ consent, onChange }) {
-  const [open, setOpen] = useState(consent === null);
-  if (!isMetaPixelConfigured()) return null;
+function MarketingConsentControl({ consent, onChange, open, onClose }) {
+  if (!isMetaPixelConfigured() || !open) return null;
 
-  return <aside className={`marketing-consent${open ? ' is-open' : ''}`} aria-label="Optional ad measurement settings">
-    {open ? <>
+  return <aside className="marketing-consent is-open" aria-label="Optional ad measurement settings">
       <div className="marketing-consent-copy">
         <strong>Optional ad measurement</strong>
-        <p>If you allow it, Meta will receive page and service views, cart starts, and confirmed appointment/payment events, along with browser/device signals normally sent with those requests. Your name, phone number, and email are never sent to Meta. Campaign tags may be saved with a confirmed booking so the salon can see which ad brought it. You can change this choice here later.</p>
+        <p>If you allow it, Meta will receive page and service views, cart starts, and confirmed appointment/payment events, along with browser/device signals normally sent with those requests. Your name, phone number, and email are never sent to Meta. Campaign tags may be saved with a confirmed booking so the salon can see which ad brought it. You can change this choice later from the site footer.</p>
       </div>
       <div className="marketing-consent-actions">
-        <button type="button" onClick={() => { onChange('denied'); setOpen(false); }}>Decline</button>
-        <button type="button" className="marketing-consent-accept" onClick={() => { onChange('granted'); setOpen(false); }}>Allow measurement</button>
+        <button type="button" onClick={() => { onChange('denied'); onClose(); }}>Decline</button>
+        <button type="button" className="marketing-consent-accept" onClick={() => { onChange('granted'); onClose(); }}>Allow measurement</button>
       </div>
-    </> : <button type="button" className="marketing-consent-settings" onClick={() => setOpen(true)}>Ad measurement settings</button>}
   </aside>;
 }
 
@@ -456,6 +453,7 @@ export default function App() {
     } catch { return []; }
   });
   const [marketingConsent, setMarketingConsentState] = useState(() => readMarketingConsent());
+  const [marketingConsentOpen, setMarketingConsentOpen] = useState(() => readMarketingConsent() === null);
   const route = resolveRoute(pathname);
   const lastTrackedPageRef = useRef('');
 
@@ -550,7 +548,7 @@ export default function App() {
   }
 
   return <NavigationContext.Provider value={navigate}>
-    <PageFrame salon={salon} cartCount={cartIds.length}>{page}</PageFrame>
-    <MarketingConsentControl consent={marketingConsent} onChange={setMarketingConsent} />
+    <PageFrame salon={salon} cartCount={cartIds.length} onOpenMarketingSettings={isMetaPixelConfigured() ? () => setMarketingConsentOpen(true) : null}>{page}</PageFrame>
+    <MarketingConsentControl consent={marketingConsent} onChange={setMarketingConsent} open={marketingConsentOpen} onClose={() => setMarketingConsentOpen(false)} />
   </NavigationContext.Provider>;
 }
