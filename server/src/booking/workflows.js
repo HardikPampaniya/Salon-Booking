@@ -40,6 +40,13 @@ const rawHoldBodySchema = z.object({
   age: z.number().int().min(1).max(120),
   managementToken: z.string().min(32).max(200),
   policyAccepted: z.literal(true),
+  attribution: z.object({
+    channel: z.enum(['direct', 'instagram_ad', 'facebook_ad', 'organic_instagram', 'organic_facebook', 'other_referral']),
+    source: z.string().trim().max(60).regex(/^[\p{L}\p{N}._ -]*$/u).optional(),
+    medium: z.string().trim().max(60).regex(/^[\p{L}\p{N}._ -]*$/u).optional(),
+    campaign: z.string().trim().max(120).regex(/^[\p{L}\p{N}._ -]*$/u).optional(),
+    content: z.string().trim().max(120).regex(/^[\p{L}\p{N}._ -]*$/u).optional(),
+  }).strict().optional(),
 });
 
 export const holdBodySchema = rawHoldBodySchema.superRefine((data, context) => {
@@ -335,6 +342,7 @@ async function saveHold({ data, idempotencyKey }) {
             gender: data.gender,
             age: data.age,
           },
+          ...(data.attribution ? { marketingAttribution: { ...data.attribution, consentedAt: now } } : {}),
           managementTokenHash: hashToken(data.managementToken),
           managementExpiresAt,
           policyVersion: POLICY_VERSION,

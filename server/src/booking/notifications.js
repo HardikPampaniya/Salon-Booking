@@ -45,6 +45,20 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function marketingAttributionSummary(attribution) {
+  if (!attribution?.channel || !attribution.consentedAt) return '';
+  const labels = {
+    direct: 'Direct website visit',
+    instagram_ad: 'Instagram advertisement',
+    facebook_ad: 'Facebook advertisement',
+    organic_instagram: 'Organic Instagram',
+    organic_facebook: 'Organic Facebook',
+    other_referral: 'Other referral',
+  };
+  const campaign = attribution.campaign ? ` · ${attribution.campaign}` : '';
+  return `${labels[attribution.channel] || 'Other referral'}${campaign}`;
+}
+
 function bookingEmail({ role, booking, salonName, statusText, eventType, when, services, note }) {
   const isCustomer = role === 'customer';
   const heading = eventType === 'confirmed'
@@ -64,7 +78,8 @@ function bookingEmail({ role, booking, salonName, statusText, eventType, when, s
     <tr><td style="padding:8px 0;color:#786d64">Phone</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.phone)}</td></tr>
     ${booking.customer.email ? `<tr><td style="padding:8px 0;color:#786d64">Email</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.email)}</td></tr>` : ''}
     ${booking.customer.gender ? `<tr><td style="padding:8px 0;color:#786d64">Gender</td><td style="padding:8px 0;color:#403a36">${escapeHtml(booking.customer.gender)}</td></tr>` : ''}
-    ${Number.isInteger(booking.customer.age) ? `<tr><td style="padding:8px 0;color:#786d64">Age</td><td style="padding:8px 0;color:#403a36">${booking.customer.age}</td></tr>` : ''}`;
+    ${Number.isInteger(booking.customer.age) ? `<tr><td style="padding:8px 0;color:#786d64">Age</td><td style="padding:8px 0;color:#403a36">${booking.customer.age}</td></tr>` : ''}
+    ${marketingAttributionSummary(booking.marketingAttribution) ? `<tr><td style="padding:8px 0;color:#786d64">Marketing source</td><td style="padding:8px 0;color:#403a36">${escapeHtml(marketingAttributionSummary(booking.marketingAttribution))}</td></tr>` : ''}`;
   const settlementLabel = booking.servicePricePaise < booking.advancePaise
     ? 'Cash change to return after service'
     : 'Remaining balance at the salon';
@@ -120,6 +135,7 @@ function bookingEmail({ role, booking, salonName, statusText, eventType, when, s
       ...(booking.customer.email ? [`Email: ${booking.customer.email}`] : []),
       ...(booking.customer.gender ? [`Gender: ${booking.customer.gender}`] : []),
       ...(Number.isInteger(booking.customer.age) ? [`Age: ${booking.customer.age}`] : []),
+      ...(marketingAttributionSummary(booking.marketingAttribution) ? [`Marketing source: ${marketingAttributionSummary(booking.marketingAttribution)}`] : []),
     ] : []),
     '',
     'Services:',

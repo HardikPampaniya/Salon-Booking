@@ -69,3 +69,11 @@ No public appointment can currently be reserved and no payment should be collect
 ## Deployment
 
 The Render preview is <https://dream-beauty-unisex-studio-karanjade.onrender.com/>. The checked-in blueprint keeps booking disabled. Do not enable public checkout before private test-mode payment checks, webhook checks, browser review, and owner sign-off. Store credentials in Render's private environment settings, not Git. See the deployment runbook for Atlas, Render, and custom-domain setup.
+
+## Meta advertising preparation
+
+Draft strategy, ad copy, creative direction, Pixel setup, launch checklist, and UTM reporting notes are in [marketing/meta-ads/](marketing/meta-ads/). No Meta campaign has been created or submitted, and no advertising money has been spent.
+
+The client includes optional-consent-gated Meta Pixel hooks. Nothing is sent until a numeric `VITE_META_PIXEL_ID` is configured and the site visitor allows optional ad measurement. The hooks record `Schedule` only after server-confirmed booking and `Purchase` only for the captured advance amount. Customer name, phone, email, age, gender, booking reference, and payment identifiers are not sent to Meta. UTM attribution is saved with a booking only after consent and appears only in the salon owner's confirmation email.
+
+The Render blueprint defaults `BOOKING_ENABLED=false`; use a Leads campaign with Instant Forms until the live readiness endpoint and payment flow confirm that online booking is ready. See [META_ADS_SETUP_GUIDE.md](marketing/meta-ads/META_ADS_SETUP_GUIDE.md) for account, Pixel, consent, and Events Manager setup.

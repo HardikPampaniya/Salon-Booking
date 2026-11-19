@@ -17,3 +17,5 @@ services:
         value: Asia/Kolkata
       - key: TRUST_PROXY_HOPS
         value: "1"
+      - key: VITE_META_PIXEL_ID
+        value: "2157984908149374"

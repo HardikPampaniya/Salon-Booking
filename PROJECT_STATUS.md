@@ -1,6 +1,23 @@
 ﻿# Project status
 
-## Current milestone: arrival booking and INR 100 checkout
+## Current milestone: Meta ad preparation (not published)
+
+- Audited the website source and booking/payment flow for local ad readiness. The checked-in Render blueprint defaults booking off. The live Render readiness endpoint and current custom-domain rendering could not be independently fetched during this pass; confirm in a normal browser before choosing a booking-conversion destination.
+- Confirmed no Meta Pixel/Dataset ID or Meta ad account access is configured in the repository. Prepared optional-consent-gated Pixel events using the public `VITE_META_PIXEL_ID` build variable; no access token or customer PII is placed in browser events.
+- Prepared `PageView`, category `ViewContent`, `AddToCart`, `InitiateCheckout`, and post-server-confirmation `Schedule` plus actual captured-advance `Purchase` events. The tracking code stays dormant without both a valid Pixel ID and visitor consent. Conversions API is not configured.
+- Added minimal consented UTM attribution to booking records and owner confirmation email; customer contact details, booking reference, and payment identifiers are excluded from Meta events.
+- Added a local ad-preparation pack at `marketing/meta-ads/`: strategy, three copy concepts, creative brief, Meta setup guide, launch checklist, and campaign tracking/reporting notes.
+- Campaigns and spend remain on hold until the salon supplies its Page/Instagram/ad account/Pixels and owner approval of assets, offer terms, budget, destination, and booking readiness. The proposed ₹300/day for 5–7 days is not authorized spend.
+- Current website offers in the project expired on 8 November 2026; they are excluded from the new ad drafts. Existing customer feedback has not been approved for paid ad use.
+
+### Verification for this milestone
+
+- `npm test` passed: 35 server tests and 10 client tests.
+- `npm run build` passed with Vite 7.3.7; `git diff --check` passed.
+- Still pending: test the Pixel in Events Manager with the salon's real Dataset ID and consent, then verify successful and failed payment event behavior in Razorpay Test Mode.
+- Pending: owner-side confirmation of the Meta Page, linked Instagram account, ad account, payment method, assets, and budget. No ad has been submitted or published.
+
+## Previous milestone: arrival booking and INR 100 checkout
 
 - Removed qualified-staff, employee-schedule, and service-duration requirements from online booking.
 - Checkout offers salon-local dates and one-hour arrival windows during configured opening hours. The selected window tells the salon when the customer plans to arrive; service may begin when the salon team is available.

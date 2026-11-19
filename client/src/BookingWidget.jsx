@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiUrl } from './api.js';
+import { getCampaignAttributionForBooking, trackConfirmedAppointment, trackInitiateCheckout } from './marketing.js';
 
 const ADVANCE_PAISE = 10_000;
 let checkoutScriptPromise;
@@ -178,9 +179,10 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     setMessage(text);
     setMessageTone(tone);
   };
-  function completeConfirmedPayment(serviceIds, reference) {
+  function completeConfirmedPayment(serviceIds, reference, advancePaise) {
     if (completionStartedRef.current) return;
     completionStartedRef.current = true;
+    trackConfirmedAppointment(reference, advancePaise);
     onBookingConfirmed(Array.isArray(serviceIds) && serviceIds.length ? serviceIds : cartIds);
     attemptRef.current = null;
     managementRef.current = null;
@@ -276,7 +278,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     }));
     if (result.booking.status === 'confirmed') {
       const bookedIds = (result.booking.services || []).map((service) => service.serviceId).filter(Boolean);
-      completeConfirmedPayment(bookedIds, result.booking.reference);
+      completeConfirmedPayment(bookedIds, result.booking.reference, result.booking.advancePaise);
       return result;
     }
     setManaged(result);
@@ -296,7 +298,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       }));
       if (result.booking.status === 'confirmed') {
         const bookedIds = (result.booking.services || []).map((service) => service.serviceId).filter(Boolean);
-        completeConfirmedPayment(bookedIds, result.booking.reference);
+        completeConfirmedPayment(bookedIds, result.booking.reference, result.booking.advancePaise);
         return;
       } else if (result.booking.status === 'expired' && ['created', 'failed'].includes(result.payment?.status)) {
         setManaged(result);
@@ -331,7 +333,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     }));
     if (verification.booking.status === 'confirmed') {
       const bookedIds = (verification.booking.services || []).map((service) => service.serviceId).filter(Boolean);
-      completeConfirmedPayment(bookedIds.length ? bookedIds : submittedServiceIds, verification.booking.reference);
+      completeConfirmedPayment(bookedIds.length ? bookedIds : submittedServiceIds, verification.booking.reference, verification.booking.advancePaise);
       return;
     }
     setManaged(verification);
@@ -350,6 +352,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     showMessage('');
     try {
       const serviceIds = cartServices.map((service) => service.id);
+      trackInitiateCheckout(cartServices);
       const fingerprint = JSON.stringify({ serviceIds, date, startAt, customer });
       if (!attemptRef.current || attemptRef.current.fingerprint !== fingerprint) {
         const prior = sessionStorage.getItem('salon_booking_attempt');
@@ -361,6 +364,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         };
         sessionStorage.setItem('salon_booking_attempt', JSON.stringify(attemptRef.current));
       }
+      const attribution = getCampaignAttributionForBooking();
       const hold = await responseJson(await fetch(apiUrl('/api/bookings/holds'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attemptRef.current.idempotencyKey },
@@ -375,13 +379,14 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           age: Number(customer.age),
           managementToken: attemptRef.current.managementToken,
           policyAccepted: acceptedPolicy,
+          ...(attribution ? { attribution } : {}),
         }),
       }));
       const management = { reference: hold.booking.reference, token: hold.managementToken || attemptRef.current.managementToken };
       managementRef.current = management;
       sessionStorage.setItem('salon_booking_management', JSON.stringify(management));
       if (hold.booking.status === 'confirmed') {
-        completeConfirmedPayment(serviceIds, hold.booking.reference);
+        completeConfirmedPayment(serviceIds, hold.booking.reference, hold.booking.advancePaise);
         return;
       }
       if (!hold.payment) throw new Error('Payment setup is not ready. Your visit booking has not been confirmed.');

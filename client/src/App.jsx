@@ -1,8 +1,17 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import BookingWidget from './BookingWidget.jsx';
 import { apiUrl } from './api.js';
 import { brandImage, categoryImages, galleryImages, homeHeroImage } from './service-images.js';
 import { resolveRoute, servicesForCategory } from './routes.js';
+import {
+  captureCampaignAttribution,
+  isMetaPixelConfigured,
+  readMarketingConsent,
+  saveMarketingConsent,
+  trackAddToCart,
+  trackCategoryView,
+  trackPageView,
+} from './marketing.js';
 
 const NavigationContext = createContext(() => {});
 const fallbackSalon = {
@@ -133,6 +142,24 @@ function PageFrame({ salon, cartCount, children }) {
   </>;
 }
 
+function MarketingConsentControl({ consent, onChange }) {
+  const [open, setOpen] = useState(consent === null);
+  if (!isMetaPixelConfigured()) return null;
+
+  return <aside className={`marketing-consent${open ? ' is-open' : ''}`} aria-label="Optional ad measurement settings">
+    {open ? <>
+      <div className="marketing-consent-copy">
+        <strong>Optional ad measurement</strong>
+        <p>If you allow it, Meta will receive page and service views, cart starts, and confirmed appointment/payment events, along with browser/device signals normally sent with those requests. Your name, phone number, and email are never sent to Meta. Campaign tags may be saved with a confirmed booking so the salon can see which ad brought it. You can change this choice here later.</p>
+      </div>
+      <div className="marketing-consent-actions">
+        <button type="button" onClick={() => { onChange('denied'); setOpen(false); }}>Decline</button>
+        <button type="button" className="marketing-consent-accept" onClick={() => { onChange('granted'); setOpen(false); }}>Allow measurement</button>
+      </div>
+    </> : <button type="button" className="marketing-consent-settings" onClick={() => setOpen(true)}>Ad measurement settings</button>}
+  </aside>;
+}
+
 function CategoryVisual({ category, className = '', priority = false, image }) {
   const visual = image ?? categoryImages[category] ?? {
     src: null, alt: `${category} at The Dream Beauty Unisex Studio`, label: category, tone: 'rose',
@@ -187,7 +214,10 @@ function ServiceCard({ service, index, compact = false, cartIds, addToCart, remo
     {getServiceDetails(service) && <p className="service-details">{getServiceDetails(service)}</p>}
     <div className="service-meta"><span>{service.isDiwaliOffer ? offerEndLabel(service) : Number.isInteger(service.durationMinutes) && service.durationMinutes > 0 ? `${service.durationMinutes} minute visit` : 'Duration to be confirmed'}</span><strong>{price}</strong></div>
     {canAddToCart
-      ? <button className={`service-cart-button${inCart ? ' is-added' : ''}`} type="button" disabled={!inCart && cartIds.length >= 20} onClick={() => inCart ? removeFromCart(service.id) : addToCart(service.id)} aria-pressed={inCart}>{inCart ? 'Remove from cart' : cartIds.length >= 20 ? 'Cart limit reached' : 'Add to cart'} <span aria-hidden="true">{inCart ? '−' : '+'}</span></button>
+      ? <button className={`service-cart-button${inCart ? ' is-added' : ''}`} type="button" disabled={!inCart && cartIds.length >= 20} onClick={() => {
+        if (inCart) removeFromCart(service.id);
+        else { trackAddToCart(service); addToCart(service.id); }
+      }} aria-pressed={inCart}>{inCart ? 'Remove from cart' : cartIds.length >= 20 ? 'Cart limit reached' : 'Add to cart'} <span aria-hidden="true">{inCart ? '−' : '+'}</span></button>
       : <p className="service-cart-unavailable">{service.needsConfirmation ? 'Add to cart will appear after the studio confirms the details below.' : 'Not currently available to add to cart.'}</p>}
   </article>;
 }
@@ -425,7 +455,14 @@ export default function App() {
       return Array.isArray(saved) ? [...new Set(saved.filter((id) => typeof id === 'string'))].slice(0, 20) : [];
     } catch { return []; }
   });
+  const [marketingConsent, setMarketingConsentState] = useState(() => readMarketingConsent());
   const route = resolveRoute(pathname);
+  const lastTrackedPageRef = useRef('');
+
+  const setMarketingConsent = useCallback((value) => {
+    saveMarketingConsent(value);
+    setMarketingConsentState(value);
+  }, []);
 
   useEffect(() => {
     try { sessionStorage.setItem('salon_service_cart', JSON.stringify(cartIds)); } catch { /* The in-memory cart remains available for this page session. */ }
@@ -491,6 +528,16 @@ export default function App() {
     canonical.href = new URL(category?.path || route.path, window.location.origin).href;
   }, [route.type, route.category, salon.name, categoryPages]);
 
+  useEffect(() => {
+    if (marketingConsent !== 'granted') return;
+    const viewKey = `${marketingConsent}:${route.path}`;
+    if (lastTrackedPageRef.current === viewKey) return;
+    lastTrackedPageRef.current = viewKey;
+    captureCampaignAttribution();
+    trackPageView();
+    if (route.type === 'category') trackCategoryView(route.category);
+  }, [marketingConsent, route.path, route.type, route.category]);
+
   let page;
   switch (route.type) {
     case 'home': page = <HomePage salon={salon} services={services} categoryPages={categoryPages} apiState={apiState} cartIds={cartIds} addToCart={addToCart} removeFromCart={removeFromCart} />; break;
@@ -502,5 +549,8 @@ export default function App() {
     default: page = <NotFoundPage salon={salon} />;
   }
 
-  return <NavigationContext.Provider value={navigate}><PageFrame salon={salon} cartCount={cartIds.length}>{page}</PageFrame></NavigationContext.Provider>;
+  return <NavigationContext.Provider value={navigate}>
+    <PageFrame salon={salon} cartCount={cartIds.length}>{page}</PageFrame>
+    <MarketingConsentControl consent={marketingConsent} onChange={setMarketingConsent} />
+  </NavigationContext.Provider>;
 }

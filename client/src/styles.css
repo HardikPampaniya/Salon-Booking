@@ -317,6 +317,18 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
+.marketing-consent { position: fixed; right: 18px; bottom: 18px; z-index: 1000; width: min(440px, calc(100vw - 36px)); padding: 16px; border: 1px solid #cbb9aa; background: #fffdfa; color: #403a36; box-shadow: 0 12px 36px #211d1b2b; }
+.marketing-consent-copy strong { display: block; margin-bottom: 6px; font: 600 13px "DM Sans", sans-serif; }
+.marketing-consent-copy p { margin: 0; color: #685d55; font-size: 11px; line-height: 1.6; }
+.marketing-consent-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 13px; }
+.marketing-consent-actions button, .marketing-consent-settings { min-height: 38px; border: 1px solid #aa8879; padding: 0 12px; background: #fffdfa; color: #604d43; font: 600 10px "DM Sans", sans-serif; cursor: pointer; }
+.marketing-consent-actions .marketing-consent-accept { border-color: #59473e; background: #59473e; color: #fffaf5; }
+.marketing-consent-settings { position: absolute; right: 0; bottom: 0; transform: translateY(calc(100% + 8px)); background: #fffdfa; box-shadow: 0 4px 14px #211d1b1a; }
+@media (max-width: 520px) {
+  .marketing-consent { right: 10px; bottom: 10px; width: calc(100vw - 20px); padding: 13px; }
+  .marketing-consent-copy p { font-size: 10px; }
+}
+
 /* Multi-page salon site */
 .hero-short { min-height: 560px; }
 .hero-short .hero-visual { min-height: 410px; }
