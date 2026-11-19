@@ -147,6 +147,8 @@ h1 em, h2 em { color: #b28071; font-weight: 400; }
 .booking-fields label { display: flex; flex-direction: column; gap: 7px; color: #574d46; font-size: 10px; font-weight: 600; text-align: left; }
 .booking-fields label span { display: inline; color: #82766e; font-weight: 400; }
 .booking-fields input, .booking-fields select { width: 100%; min-height: 42px; border: 1px solid #d9d0c7; border-radius: 0; padding: 0 11px; background: #fffdfa; color: #403a36; font: 400 12px "DM Sans", sans-serif; }
+.booking-fields input.is-invalid, .booking-fields select.is-invalid { border-color: #b42318; box-shadow: inset 0 -2px 0 #b42318; }
+.booking-fields label .field-error { display: block; margin-top: -3px; color: #b42318; font-size: 11px; line-height: 1.4; font-weight: 500; }
 .booking-fields input:focus, .booking-fields select:focus, .slot-choice:focus-visible, .booking-submit:focus-visible, .booking-action-button:focus-visible { outline: 3px solid #b77f70; outline-offset: 2px; }
 .booking-fields label:first-child { grid-column: 1 / -1; }
 .slot-picker { min-width: 0; margin: 19px 0; padding: 0; border: 0; }

@@ -34,7 +34,13 @@ const rawHoldBodySchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   startAt: z.string().datetime({ offset: true }),
   name: z.string().trim().min(2).max(100),
-  phone: z.string().trim().regex(/^\+?[0-9 ()-]{7,20}$/),
+  phone: z.string().trim()
+    .transform((value) => {
+      const digits = value.replace(/\D/g, '');
+      return digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+    })
+    .refine((value) => /^[6-9]\d{9}$/.test(value), 'Enter a valid 10-digit Indian mobile number.')
+    .transform((value) => `+91${value}`),
   email: z.string().trim().toLowerCase().email().max(254),
   gender: z.enum(['male', 'female']),
   age: z.number().int().min(1).max(120),

@@ -68,6 +68,48 @@ function formatMoney(paise) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(paise / 100);
 }
 
+function indianMobileDigits(value) {
+  const digits = String(value || '').replace(/\D/g, '');
+  return digits.length === 12 && digits.startsWith('91') ? digits.slice(2) : digits;
+}
+
+function normalizedIndianMobile(value) {
+  const digits = indianMobileDigits(value);
+  return /^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : '';
+}
+
+function customerFieldErrors(customer) {
+  const phoneDigits = indianMobileDigits(customer.phone);
+  const email = customer.email.trim();
+  const age = Number(customer.age);
+  return {
+    phone: !phoneDigits
+      ? 'Enter your 10-digit mobile number.'
+      : (/^[6-9]\d{9}$/.test(phoneDigits) ? '' : 'Enter a valid 10-digit Indian mobile number.'),
+    email: !email
+      ? 'Enter an email address.'
+      : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : 'Enter a valid email address.'),
+    age: !String(customer.age).trim()
+      ? 'Enter your age.'
+      : (Number.isInteger(age) && age >= 1 && age <= 120 ? '' : 'Enter an age from 1 to 120.'),
+  };
+}
+
+function holdMatchesCheckout(booking, { serviceIds, date, startAt, customer }) {
+  if (!booking?.customer) return false;
+  const heldServiceIds = booking.services?.length
+    ? booking.services.map((service) => service.serviceId)
+    : [booking.serviceId];
+  return JSON.stringify(heldServiceIds) === JSON.stringify(serviceIds)
+    && booking.visitDate === date
+    && new Date(booking.startAt).getTime() === new Date(startAt).getTime()
+    && booking.customer.name === customer.name
+    && indianMobileDigits(booking.customer.phone) === indianMobileDigits(customer.phone)
+    && String(booking.customer.email || '').trim().toLowerCase() === customer.email
+    && booking.customer.gender === customer.gender
+    && booking.customer.age === customer.age;
+}
+
 function formatArrivalWindow(startAt, endAt, timezone) {
   const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: timezone || 'Asia/Kolkata', timeStyle: 'short' });
   const start = formatter.format(new Date(startAt));
@@ -76,7 +118,11 @@ function formatArrivalWindow(startAt, endAt, timezone) {
 
 async function responseJson(response) {
   const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error?.message || 'That request could not be completed. Please try again.');
+  if (!response.ok) {
+    const error = new Error(result.error?.message || 'That request could not be completed. Please try again.');
+    error.code = result.error?.code;
+    throw error;
+  }
   return result;
 }
 
@@ -161,6 +207,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const [availability, setAvailability] = useState(null);
   const [availabilityState, setAvailabilityState] = useState('idle');
   const [customer, setCustomer] = useState({ name: '', phone: '', email: '', gender: '', age: '' });
+  const [touchedFields, setTouchedFields] = useState({});
   const [acceptedPolicy, setAcceptedPolicy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -174,6 +221,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const timePickerRef = useRef(null);
   const timePickerTriggerRef = useRef(null);
   const successDialogRef = useRef(null);
+  const arrivalRestoreRef = useRef(null);
   const [timePickerOpen, setTimePickerOpen] = useState(false);
   const showMessage = (text, tone = 'info') => {
     setMessage(text);
@@ -220,6 +268,10 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       .then((data) => {
         setAvailability(data);
         setAvailabilityState(data.closed ? 'closed' : (data.slots || []).length ? 'ready' : 'empty');
+        if (arrivalRestoreRef.current?.date === date) {
+          setStartAt(arrivalRestoreRef.current.startAt);
+          arrivalRestoreRef.current = null;
+        }
       })
       .catch((error) => {
         if (error.name !== 'AbortError') {
@@ -265,7 +317,20 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
       const parsed = JSON.parse(saved);
       if (parsed.reference && parsed.token) {
         managementRef.current = parsed;
-        refreshManaged(parsed.reference, parsed.token).catch(() => {});
+        refreshManaged(parsed.reference, parsed.token).then((result) => {
+          if (result.booking.status !== 'held') return;
+          setDate(result.booking.visitDate);
+          setStartAt(result.booking.startAt);
+          arrivalRestoreRef.current = { date: result.booking.visitDate, startAt: result.booking.startAt };
+          setCustomer({
+            name: result.booking.customer?.name || '',
+            phone: result.booking.customer?.phone || '',
+            email: result.booking.customer?.email || '',
+            gender: result.booking.customer?.gender || '',
+            age: Number.isInteger(result.booking.customer?.age) ? String(result.booking.customer.age) : '',
+          });
+          setAcceptedPolicy(true);
+        }).catch(() => {});
       }
     } catch { sessionStorage.removeItem('salon_booking_management'); }
   }, []);
@@ -347,13 +412,88 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
     }
   }
 
+  async function openPaymentCheckout(hold, serviceIds, checkoutCustomer) {
+    if (!hold.payment?.orderId) throw new Error('Payment setup is still being prepared. Please try again in a moment.');
+    await loadCheckout();
+    const checkout = new window.Razorpay({
+      key: hold.payment.keyId,
+      order_id: hold.payment.orderId,
+      amount: hold.payment.amountPaise,
+      currency: hold.payment.currency,
+      name: salon.name,
+      description: `${serviceIds.length} salon service${serviceIds.length === 1 ? '' : 's'} · ₹100 advance`,
+      prefill: { name: checkoutCustomer.name, contact: checkoutCustomer.phone, email: checkoutCustomer.email },
+      notes: { booking_reference: hold.booking.reference },
+      theme: { color: '#8e6258' },
+      handler: async (paymentResponse) => {
+        setBusy(true);
+        try { await verifyAndRefresh(paymentResponse, serviceIds); }
+        catch { showMessage('We received your payment response, but could not confirm the booking yet. Do not pay again; use Check payment status below.', 'warning'); }
+        finally { setBusy(false); }
+      },
+      modal: { ondismiss: () => showMessage('Checkout was closed. Your cart is saved; your held arrival time can be paid again from this page.', 'info') },
+    });
+    checkout.on('payment.failed', (event) => showMessage(event.error?.description || 'Payment did not go through. Your cart is saved; you can try again while the arrival hold is active.', 'error'));
+    checkout.open();
+    setManaged({ booking: hold.booking, payment: { status: hold.payment.status }, refund: null });
+    const minutesLeft = Math.max(1, Math.ceil((new Date(hold.booking.holdExpiresAt).getTime() - Date.now()) / 60_000));
+    showMessage(`Your arrival time is held for ${minutesLeft} more minute${minutesLeft === 1 ? '' : 's'}. Pay ${formatMoney(ADVANCE_PAISE)} to confirm your visit.`, 'info');
+  }
+
   async function startCheckout() {
+    setTouchedFields((fields) => ({ ...fields, phone: true, email: true, age: true }));
+    const currentErrors = customerFieldErrors(customer);
+    const invalidField = customer.name.trim().length < 2 ? 'booking-name'
+      : currentErrors.phone ? 'booking-phone'
+        : currentErrors.email ? 'booking-email'
+          : !['male', 'female'].includes(customer.gender) ? 'booking-gender'
+            : currentErrors.age ? 'booking-age' : '';
+    if (invalidField) {
+      showMessage('Please correct the customer details before continuing.', 'error');
+      document.getElementById(invalidField)?.focus();
+      return;
+    }
     setBusy(true);
     showMessage('');
     try {
       const serviceIds = cartServices.map((service) => service.id);
+      const checkoutCustomer = {
+        name: customer.name.trim(),
+        phone: normalizedIndianMobile(customer.phone),
+        email: customer.email.trim().toLowerCase(),
+        gender: customer.gender,
+        age: Number(customer.age),
+      };
+      const fingerprint = JSON.stringify({ serviceIds, date, startAt, customer: checkoutCustomer });
       trackInitiateCheckout(cartServices);
-      const fingerprint = JSON.stringify({ serviceIds, date, startAt, customer });
+
+      if (!managementRef.current) {
+        try { managementRef.current = JSON.parse(sessionStorage.getItem('salon_booking_management') || 'null'); }
+        catch { sessionStorage.removeItem('salon_booking_management'); }
+      }
+      if (managementRef.current?.reference && managementRef.current?.token) {
+        const existing = await refreshManaged(managementRef.current.reference, managementRef.current.token);
+        if (existing.booking.status === 'confirmed') return;
+        const activeHold = existing.booking.status === 'held'
+          && new Date(existing.booking.holdExpiresAt).getTime() > Date.now();
+        if (activeHold && holdMatchesCheckout(existing.booking, { serviceIds, date, startAt, customer: checkoutCustomer })) {
+          if (['created', 'failed'].includes(existing.payment?.status) && existing.payment?.orderId) {
+            await openPaymentCheckout(existing, serviceIds, checkoutCustomer);
+          } else {
+            showMessage(existing.payment?.status === 'authorized'
+              ? 'Your payment is awaiting confirmation. Please do not pay again; use Check payment status.'
+              : 'Your arrival time is held while payment setup finishes. Please wait a moment before trying again.', 'warning');
+          }
+          return;
+        }
+        const sameHeldSlot = activeHold && existing.booking.visitDate === date
+          && new Date(existing.booking.startAt).getTime() === new Date(startAt).getTime();
+        if (sameHeldSlot) {
+          showMessage('This arrival time is still held by your previous checkout. Restore those booking details to retry payment, or choose another time.', 'warning');
+          return;
+        }
+      }
+
       if (!attemptRef.current || attemptRef.current.fingerprint !== fingerprint) {
         const prior = sessionStorage.getItem('salon_booking_attempt');
         const stored = prior ? JSON.parse(prior) : null;
@@ -372,11 +512,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           serviceIds,
           date,
           startAt,
-          name: customer.name,
-          phone: customer.phone,
-          email: customer.email.trim().toLowerCase(),
-          gender: customer.gender,
-          age: Number(customer.age),
+          ...checkoutCustomer,
           managementToken: attemptRef.current.managementToken,
           policyAccepted: acceptedPolicy,
           ...(attribution ? { attribution } : {}),
@@ -389,32 +525,31 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
         completeConfirmedPayment(serviceIds, hold.booking.reference, hold.booking.advancePaise);
         return;
       }
-      if (!hold.payment) throw new Error('Payment setup is not ready. Your visit booking has not been confirmed.');
-      await loadCheckout();
-      const checkout = new window.Razorpay({
-        key: hold.payment.keyId,
-        order_id: hold.payment.orderId,
-        amount: hold.payment.amountPaise,
-        currency: hold.payment.currency,
-        name: salon.name,
-        description: `${serviceIds.length} salon service${serviceIds.length === 1 ? '' : 's'} · ₹100 advance`,
-        prefill: { name: customer.name, contact: customer.phone, email: customer.email.trim() },
-        notes: { booking_reference: hold.booking.reference },
-        theme: { color: '#8e6258' },
-        handler: async (paymentResponse) => {
-          setBusy(true);
-          try { await verifyAndRefresh(paymentResponse, serviceIds); }
-          catch { showMessage('We received your payment response, but could not confirm the booking yet. Do not pay again; use Check payment status below.', 'warning'); }
-          finally { setBusy(false); }
-        },
-        modal: { ondismiss: () => showMessage('Checkout was closed. Your cart is saved; the arrival time is held briefly while you decide whether to retry.', 'info') },
-      });
-      checkout.on('payment.failed', (event) => showMessage(event.error?.description || 'Payment did not go through. Your cart is saved; you can try again while the arrival hold is active.', 'error'));
-      checkout.open();
-      setManaged({ booking: hold.booking, payment: { status: hold.payment.status }, refund: null });
-      showMessage(`Your arrival time is held for 10 minutes. Pay ${formatMoney(ADVANCE_PAISE)} to confirm your visit.`, 'info');
+      await openPaymentCheckout(hold, serviceIds, checkoutCustomer);
     } catch (error) {
-      showMessage(error.message, 'error');
+      if (error.code === 'IDEMPOTENCY_KEY_REUSED') {
+        if (managementRef.current?.reference && managementRef.current?.token) {
+          try {
+            const existing = await refreshManaged(managementRef.current.reference, managementRef.current.token);
+            const serviceIds = cartServices.map((service) => service.id);
+            const checkoutCustomer = {
+              name: customer.name.trim(), phone: normalizedIndianMobile(customer.phone),
+              email: customer.email.trim().toLowerCase(), gender: customer.gender, age: Number(customer.age),
+            };
+            if (existing.booking.status === 'confirmed') return;
+            if (existing.booking.status === 'held'
+              && new Date(existing.booking.holdExpiresAt).getTime() > Date.now()
+              && holdMatchesCheckout(existing.booking, { serviceIds, date, startAt, customer: checkoutCustomer })
+              && existing.payment?.orderId && ['created', 'failed'].includes(existing.payment.status)) {
+              await openPaymentCheckout(existing, serviceIds, checkoutCustomer);
+              return;
+            }
+          } catch { /* Show the safer retry guidance if recovery also fails. */ }
+        }
+        showMessage('Your earlier checkout is still linked to this arrival time. Your cart is saved; check payment status or choose another arrival time.', 'warning');
+      } else {
+        showMessage(error.message, 'error');
+      }
     } finally {
       setBusy(false);
     }
@@ -437,17 +572,27 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
   const remainingBalancePaise = Math.max(0, servicePricePaise - ADVANCE_PAISE);
   const changeReturnedAfterServicePaise = Math.max(0, ADVANCE_PAISE - servicePricePaise);
   const slots = availability?.slots || [];
-  const selectedArrival = slots.find((slot) => slot.startAt === startAt);
+  const activeHeldBooking = managed?.booking?.status === 'held'
+    && new Date(managed.booking.holdExpiresAt).getTime() > Date.now();
+  const activeHoldUsesSelectedTime = activeHeldBooking && managed.booking.visitDate === date
+    && new Date(managed.booking.startAt).getTime() === new Date(startAt).getTime();
+  const selectedArrival = slots.find((slot) => slot.startAt === startAt)
+    || (activeHoldUsesSelectedTime ? {
+      time: formatArrivalWindow(managed.booking.startAt, managed.booking.arrivalWindowEndAt, salon.timezone),
+    } : null);
   const showBooking = !forceClosed;
   const paymentEnabled = readiness?.enabled && !forceClosed;
+  const validationErrors = customerFieldErrors(customer);
+  const visibleFieldErrors = {
+    phone: touchedFields.phone && validationErrors.phone,
+    email: touchedFields.email && validationErrors.email,
+    age: touchedFields.age && validationErrors.age,
+  };
   const expiredPaymentNeedsCheck = managed?.booking?.status === 'expired'
     && ['created', 'authorized', 'failed'].includes(managed?.payment?.status)
     && reconciledReference !== managed.booking.reference;
-  const canSubmit = paymentEnabled && cartIsComplete && availabilityState === 'ready'
-    && slots.some((slot) => slot.startAt === startAt) && customer.name.trim().length >= 2
-    && customer.phone.trim().length >= 7 && ['male', 'female'].includes(customer.gender)
-    && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email.trim())
-    && Number.isInteger(Number(customer.age)) && Number(customer.age) >= 1 && Number(customer.age) <= 120
+  const canStartCheckout = paymentEnabled && cartIsComplete
+    && ((availabilityState === 'ready' && slots.some((slot) => slot.startAt === startAt)) || activeHoldUsesSelectedTime)
     && acceptedPolicy && !busy && !expiredPaymentNeedsCheck;
   const bookingOutcome = getBookingOutcome(managed, reconciledReference === managed?.booking?.reference);
 
@@ -477,7 +622,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           {cartServices.length > 0 && <>
           <div className="booking-fields">
             <label>Choose a date
-              <input type="date" disabled={!cartIsComplete} min={defaultVisitDate(salon)} max={addCalendarDays(salonDate(salon.timezone), 60)} value={date} onChange={(event) => setDate(event.target.value)} />
+              <input type="date" disabled={!cartIsComplete} min={defaultVisitDate(salon)} max={addCalendarDays(salonDate(salon.timezone), 60)} value={date} onChange={(event) => { arrivalRestoreRef.current = null; setDate(event.target.value); }} />
             </label>
           </div>
           {!cartIsComplete && <p className="booking-arrival-note" role="status">Choose services with confirmed prices before selecting an arrival time.</p>}
@@ -515,7 +660,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
             </div>
             <p className="slot-dialog-note">This one-hour window tells the salon when you plan to arrive. The service may begin when the team is available.</p>
             <div className="slot-list">{slots.map((slot) => (
-              <button className={startAt === slot.startAt ? 'slot-choice is-selected' : 'slot-choice'} type="button" key={slot.startAt} aria-pressed={startAt === slot.startAt} onClick={() => { setStartAt(slot.startAt); setTimePickerOpen(false); }}>
+              <button className={startAt === slot.startAt ? 'slot-choice is-selected' : 'slot-choice'} type="button" key={slot.startAt} aria-pressed={startAt === slot.startAt} onClick={() => { arrivalRestoreRef.current = null; setStartAt(slot.startAt); setTimePickerOpen(false); }}>
                 {slot.time}
               </button>
             ))}</div>
@@ -524,22 +669,25 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
           <>
             <div className="booking-fields">
               <label>Your name
-                <input autoComplete="name" maxLength={100} value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} />
+                <input id="booking-name" autoComplete="name" maxLength={100} value={customer.name} onChange={(event) => setCustomer({ ...customer, name: event.target.value })} />
               </label>
               <label>Phone number
-                <input autoComplete="tel" inputMode="tel" maxLength={20} value={customer.phone} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} />
+                <input id="booking-phone" type="tel" autoComplete="tel-national" inputMode="tel" maxLength={16} placeholder="10-digit mobile number" aria-invalid={Boolean(visibleFieldErrors.phone)} aria-describedby={visibleFieldErrors.phone ? 'booking-phone-error' : undefined} className={visibleFieldErrors.phone ? 'is-invalid' : ''} value={customer.phone} onBlur={() => setTouchedFields((fields) => ({ ...fields, phone: true }))} onChange={(event) => setCustomer({ ...customer, phone: event.target.value })} />
+                {visibleFieldErrors.phone && <span id="booking-phone-error" className="field-error" role="alert">{visibleFieldErrors.phone}</span>}
               </label>
               <label>Email for confirmation
-                <input type="email" autoComplete="email" inputMode="email" maxLength={254} required value={customer.email} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} />
+                <input id="booking-email" type="email" autoComplete="email" inputMode="email" maxLength={254} required aria-invalid={Boolean(visibleFieldErrors.email)} aria-describedby={visibleFieldErrors.email ? 'booking-email-error' : undefined} className={visibleFieldErrors.email ? 'is-invalid' : ''} value={customer.email} onBlur={() => setTouchedFields((fields) => ({ ...fields, email: true }))} onChange={(event) => setCustomer({ ...customer, email: event.target.value })} />
                 <span>We use this address to email your confirmation and booking updates.</span>
+                {visibleFieldErrors.email && <span id="booking-email-error" className="field-error" role="alert">{visibleFieldErrors.email}</span>}
               </label>
               <label>Gender
-                <select value={customer.gender} onChange={(event) => setCustomer({ ...customer, gender: event.target.value })}>
+                <select id="booking-gender" value={customer.gender} onChange={(event) => setCustomer({ ...customer, gender: event.target.value })}>
                   <option value="">Choose</option><option value="male">Male</option><option value="female">Female</option>
                 </select>
               </label>
               <label>Age
-                <input type="number" inputMode="numeric" min="1" max="120" step="1" value={customer.age} onChange={(event) => setCustomer({ ...customer, age: event.target.value })} />
+                <input id="booking-age" type="number" inputMode="numeric" min="1" max="120" step="1" required aria-invalid={Boolean(visibleFieldErrors.age)} aria-describedby={visibleFieldErrors.age ? 'booking-age-error' : undefined} className={visibleFieldErrors.age ? 'is-invalid' : ''} value={customer.age} onBlur={() => setTouchedFields((fields) => ({ ...fields, age: true }))} onChange={(event) => setCustomer({ ...customer, age: event.target.value })} />
+                {visibleFieldErrors.age && <span id="booking-age-error" className="field-error" role="alert">{visibleFieldErrors.age}</span>}
               </label>
             </div>
             <label className="policy-consent">
@@ -547,7 +695,7 @@ export default function BookingWidget({ salon, services, cartIds, onRemoveFromCa
               <span>I agree to the booking terms. The {formatMoney(ADVANCE_PAISE)} advance is credited against my service bill. If the services cost less than the advance, the studio returns the difference in cash after service. My selected time is an arrival window; the service may start when the salon team is available.</span>
             </label>
             {cartIsComplete && <p className="advance-summary">Service total {formatMoney(servicePricePaise)} · Pay {formatMoney(ADVANCE_PAISE)} once online now · {changeReturnedAfterServicePaise > 0 ? `${formatMoney(changeReturnedAfterServicePaise)} change returned in cash after service.` : remainingBalancePaise > 0 ? `${formatMoney(remainingBalancePaise)} balance paid at the salon.` : 'Nothing more is due at the salon.'}</p>}
-            <button className="button button-light booking-submit" type="button" disabled={!canSubmit} onClick={startCheckout}>{busy ? 'Please wait…' : 'Pay ₹100 advance'} <span aria-hidden="true">↗</span></button>
+            <button className="button button-light booking-submit" type="button" disabled={!canStartCheckout} onClick={startCheckout}>{busy ? 'Please wait…' : 'Pay ₹100 advance'} <span aria-hidden="true">↗</span></button>
             {!paymentEnabled && <div className="booking-unavailable" role="status">
             <p>{readiness ? 'Online booking and payment are not enabled yet. This page will not submit customer details or reserve the selected time until setup is enabled.' : 'Checking payment and booking setup…'}</p>
             {salon.phone && <a className="button button-light" href={`tel:${salon.phone}`}>Call the studio</a>}
